@@ -1,3 +1,7 @@
+//d3js radar chart is created by referencing
+//https://github.com/alangrafu/radar-chart-d3
+//http://bl.ocks.org/nbremer/6506614
+
 'use strict';
  angular.module('mms.directives')
     .directive('mmsD3RadarChartIo', ['ElementService', 'UtilsService','$compile', 'growl','$window', mmsD3RadarChartIo]);

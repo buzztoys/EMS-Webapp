@@ -1,3 +1,5 @@
+//d3js grouped horizontal bar chart is created by referencing
+//http://bl.ocks.org/erikvullings/51cc5332439939f1f292
 'use strict';
  angular.module('mms.directives')
     .directive('mmsD3GroupedHorizontalBarChartIo', ['ElementService', 'UtilsService','$compile', 'growl','$window', mmsD3GroupedHorizontalBarChartIo]);
