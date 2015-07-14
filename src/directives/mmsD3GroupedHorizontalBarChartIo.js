@@ -2,16 +2,19 @@
 //http://bl.ocks.org/erikvullings/51cc5332439939f1f292
 'use strict';
  angular.module('mms.directives')
-    .directive('mmsD3GroupedHorizontalBarChartIo', ['ElementService', 'UtilsService','$compile', 'growl','$window', mmsD3GroupedHorizontalBarChartIo]);
-function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, $compile, growl, $window, mmsViewCtrl) {
+    .directive('mmsD3GroupedHorizontalBarChartIo', ['ElementService', 'UtilsService', 'TableService','$compile', 'growl','$window', mmsD3GroupedHorizontalBarChartIo]);
+function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, TableService, $compile, growl, $window, mmsViewCtrl) {
       
     var mmsChartLink = function(scope, element, attrs, mmsViewCtrl) {
+      console.log("mmsChartLink");
       var d3 = $window.d3;  
       var divchart = d3.select(element[0]).append('div');
 
-      var chartdata;
+      var chartdata = [];
       var dataIdFilters = [];
-
+      var  scopedataNames = [];
+      var  scopetableColumnHeadersLabel= [];
+      
       element.click(function(e) {
         //stop Propogating event to parent(mms-transclude-doc) element.
         e.stopPropagation();
@@ -30,62 +33,58 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, $compile
       function getColor(data, i){
         return data.colors !== undefined ? d3colorR[data.colors[i]] : d3colorR[i];
       }
-      scope.tableColumnHeadersLabel=[];                   
-       var processed = false;
-        var ws = scope.mmsWs;
-        var version = scope.mmsVersion;
-        if (mmsViewCtrl) {
-            var viewVersion = mmsViewCtrl.getWsAndVersion();
-            if (!ws)
-                ws = viewVersion.workspace;
-            if (!version)
-                version = viewVersion.version;
-        }
-          var opacitydefault = 1,//0.7,
-                 opacityselected = 1.0,
-                  opacitynotselected = 0.3;
-          function mouseout(){
-            d3.selectAll(".ghbbar")
-              .transition(200)
-              .style("fill-opacity", opacitydefault); 
+      scopetableColumnHeadersLabel=[];                   
+      var processed = false;
+      var ws = scope.mmsWs;
+      var version = scope.mmsVersion;
+      if (mmsViewCtrl) {
+          var viewVersion = mmsViewCtrl.getWsAndVersion();
+          if (!ws)
+              ws = viewVersion.workspace;
+          if (!version)
+              version = viewVersion.version;
+      }
+      var opacitydefault = 1,//0.7,
+          opacityselected = 1.0,
+          opacitynotselected = 0.3;
+      function mouseout(){
+        d3.selectAll(".ghbbar")
+          .transition(200)
+          .style("fill-opacity", opacitydefault); 
 
-            d3.selectAll(".legendRect")
-              .transition(200)
-              .style("fill-opacity", opacitydefault); 
+        d3.selectAll(".legendRect")
+          .transition(200)
+          .style("fill-opacity", opacitydefault); 
+
+        d3.selectAll(".legentFilter")
+          .transition(200)
+          .style("opacity", opacitydefault);
+      }
+   
+      function mouseover(mouseoverClassId){
+            d3.selectAll(".ghbbar")
+            .transition(200)
+            .style("fill-opacity", opacitynotselected); 
+
+             d3.selectAll(".legendRect")
+            .transition(200)
+            .style("fill-opacity", opacitynotselected); 
 
             d3.selectAll(".legentFilter")
-              .transition(200)
-              .style("opacity", opacitydefault);
+            .transition(200)
+            .style("opacity", opacitynotselected);
+            
+            d3.selectAll(mouseoverClassId)
+            .transition(200)
+            .style("fill-opacity", opacityselected);
+           
+            d3.selectAll(mouseoverClassId)
+            .transition(200)
+            .style("opacity", opacityselected);
+      }
 
-          }
-          //make only a-zA-Z0-9
-          function toValidId( original){
-              //return original.replace(/\s+/g,''); //toValidId
-              return original.replace(/[^a-zA-Z0-9]/gi, '');
-          }
-          function mouseover(mouseoverClassId){
-              d3.selectAll(".ghbbar")
-              .transition(200)
-              .style("fill-opacity", opacitynotselected); 
-
-               d3.selectAll(".legendRect")
-              .transition(200)
-              .style("fill-opacity", opacitynotselected); 
-
-              d3.selectAll(".legentFilter")
-              .transition(200)
-              .style("opacity", opacitynotselected);
-              
-              d3.selectAll(mouseoverClassId)
-              .transition(200)
-              .style("fill-opacity", opacityselected);
-             
-              d3.selectAll(mouseoverClassId)
-              .transition(200)
-              .style("opacity", opacityselected);
-          }
-
-          function createFilters(data){
+      function createFilters(data){
+            console.log("createFilters");
             //create only one filter display
             d3.selectAll('.graphFilter.'+data.id).remove();
             var graphFilter = d3.select('div.'+data.id).append('div')
@@ -100,10 +99,10 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, $compile
                 .data(data.legends)
                 .enter()  
                 .append("div")
-                .attr("class", function(d,i){return "legentFilter "+ data.id + " " + toValidId(d);} )
+                .attr("class", function(d,i){return "legentFilter "+ data.id + " " + TableService.toValidId(d);} )
                 .attr("style", function(d,i){return "opacity: " + opacitydefault + ";background-color:" + getColor(data,i) + ";";})
                 .on('mouseover', function (d, i) {
-                    mouseover("."+data.id+"." + toValidId(d));
+                    mouseover("."+data.id+"." + TableService.toValidId(d));
                 })
                 .on('mouseout', function (d, i) {
                     mouseout();
@@ -114,7 +113,7 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, $compile
                       d3.select(this).append("input")
                         .attr("type", "checkbox")
                         .attr("checked",function(d,i){
-                          if (dataIdFilters[data.id][0][toValidId(d)] === true)
+                          if (dataIdFilters[data.id][0][TableService.toValidId(d)] === true)
                             return true;
                           else 
                             return null;
@@ -122,10 +121,13 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, $compile
                         .attr("style", function(d,i){var color = getColor(data,i); return "color: " +color + ";background-color:" + color + ";";})
                         .on("click", function (d) {
                             // filter by legends
-                            dataIdFilters[data.id][0][toValidId(d)] = this.checked;
-                            createGroupedHorizontalBarChart(chartdata, null); //2nd argument is not used
+                            console.log(dataIdFilters);
+                            console.log("data.id: " + data.id);
+                            console.log("TableService.toValidId(d): " + TableService.toValidId(d));
+                            dataIdFilters[data.id][0][TableService.toValidId(d)] = this.checked;
+                            createGroupedHorizontalBarChart(chartdata[data.id], null); //2nd argument is not used
                             //handle by visibility
-                            //d3.selectAll(".ghbbar."+ data.id + "." + toValidId(d) ).style("visibility", this.checked ? "visible": "hidden");
+                            //d3.selectAll(".ghbbar."+ data.id + "." + TableService.toValidId(d) ).style("visibility", this.checked ? "visible": "hidden");
                          });
                       d3.select(this).append("span")
                           .text(function (d) {
@@ -142,7 +144,7 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, $compile
                 .enter()  
                 .append("div")
                 .on('mouseover', function (d, i){
-                      mouseover("."+data.id+"." + toValidId(d));
+                      mouseover("."+data.id+"." + TableService.toValidId(d));
                 })
                 .on('mouseout', function (d, i){
                       mouseout();
@@ -153,29 +155,28 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, $compile
                     d3.select(this).append("input")
                       .attr("type", "checkbox")
                       .attr("checked", function(d,i){
-                          if (dataIdFilters[data.id][1][toValidId(d)] === true)
+                          if (dataIdFilters[data.id][1][TableService.toValidId(d)] === true)
                             return true;
                           else 
                             return null;
                       })
                       .on("click", function (d) {
                           //filter by columns(labels)
-                          dataIdFilters[data.id][1][toValidId(d)] = this.checked;     
-                          createGroupedHorizontalBarChart(chartdata, null); //2nd argument is not used
+                          dataIdFilters[data.id][1][TableService.toValidId(d)] = this.checked;     
+                          createGroupedHorizontalBarChart(chartdata[data.id], null); //2nd argument is not used
                           //visibility 
-                          //d3.selectAll("." + data.id + "."+ toValidId(d) ).style("visibility", this.checked ? "visible": "hidden");
+                          //d3.selectAll("." + data.id + "."+ TableService.toValidId(d) ).style("visibility", this.checked ? "visible": "hidden");
                        });
                     d3.select(this).append("span")
                         .text(function (d) {
                             return d;
                     });
               });
-          }
-
-        
-          function createGroupedHorizontalBarChart(data, dataIdDiv){
-              
-              if ( data.id !== "default")
+      }
+  
+      function createGroupedHorizontalBarChart(data, dataIdDiv){
+              console.log("createGroupedHorizontalBarChart");
+              if ( data.id !== "default" && dataIdDiv !== null)
                 dataIdDiv.append("h3").text(data.id);
 
               d3.select(".ghbchart." + data.id).selectAll('*').remove();
@@ -183,7 +184,7 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, $compile
               if ( svg[0][0] === null) //first time
                 svg = dataIdDiv.append("svg").attr("class", "ghbchart " + data.id);
               
-              
+             
               var filteredDataValues = [];
               var filteredDataSysmlids=[];
               var filteredDataColors=[];
@@ -193,15 +194,15 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, $compile
               var datalabelsfilter = dataIdFilters[data.id][1];              
               var counter = -1;
               for (var i=0; i<data.labels.length; i++) {
-                if ( datalabelsfilter[toValidId(data.labels[i])]){
+                if ( datalabelsfilter[TableService.toValidId(data.labels[i])]){
                   filteredDataLabels.push(data.labels[i]);
                   for (var j=0; j<data.values.length; j++) { //data.values.length == data.legends.length
                     counter++;
-                    if (datalegendsfilter[toValidId(data.legends[j])]){
+                    if (datalegendsfilter[TableService.toValidId(data.legends[j])]){
                       filteredDataValues.push(Number(data.values[j][i]));
                       filteredDataSysmlids.push(data.valuesysmlids[j][i]);
                       filteredDataColors.push(getColor(data ,counter % data.legends.length));
-                      filteredDataLegends.push(toValidId(data.legends[j]));
+                      filteredDataLegends.push(TableService.toValidId(data.legends[j]));
                     }
                   }
                 }
@@ -256,7 +257,7 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, $compile
                   .attr("fill", function(d,i) { return filteredDataColors[i]; })
                   .style("fill-opacity", opacitydefault)
                   .attr("class", function(d,i){ 
-                    return "ghbbar "+ data.id + " " + filteredDataLegends[i] + " " + toValidId(filteredDataLabels[Math.floor(i/filteredDataLegends.length)]);
+                    return "ghbbar "+ data.id + " " + filteredDataLegends[i] + " " + TableService.toValidId(filteredDataLabels[Math.floor(i/filteredDataLegends.length)]);
                     })
                   .attr("width", x)
                   .attr("height", barHeight - 1)
@@ -321,7 +322,7 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, $compile
                   })
                   //.attr("class", function(d,i){ return "ghbbar"+(i % data.series.length);})
                   .on('mouseover', function (d, i){
-                     mouseover("."+ data.id+"."+ toValidId(d));
+                     mouseover("."+ data.id+"."+ TableService.toValidId(d));
                   })
                   .on('mouseout', function (d, i){
                     mouseout();
@@ -330,7 +331,7 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, $compile
              
               legend.append('rect')
                   //.attr('class', function(d,i){ return 'legendRect' + data.id+ "-" + (i % data.series.length);})
-                  .attr('class', function(d,i){ return 'legendRect ' + data.id+ " " + toValidId(d);})
+                  .attr('class', function(d,i){ return 'legendRect ' + data.id+ " " + TableService.toValidId(d);})
                   .attr('width', legendRectSize)
                   .attr('height', legendRectSize)
                   .style("fill-opacity", opacitydefault)
@@ -343,181 +344,122 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, $compile
                   .attr('y', legendRectSize - legendSpacing)
                   .text(function (d, i) {return d; });
                   //.text(function (d, i) { return data.legends[i]; });
-          }
+      }
           
-          scope.render = function() {
-            if (scope.tableColumnHeadersLabel.length === 0) return;
-            var dataValuesPerTable;
-            //dataValuesPerTable.length = legends.length
-            for ( var k = 0; k < scope.datavalues.length; k++){
-              dataValuesPerTable = scope.datavalues[k];
-              var legends = scope.tableRowHeadersLabel[k];
-              //var dataseries= [];
-              var rowvalues=[];
-              var rowsysmlids=[];
-              //var datavalues=[];
-              //var datasysmlids=[];
-              for ( var i = 0; i < dataValuesPerTable.length; i++){
-                  var tvalues = [];
-                  var sysmlids = [];
+      scope.render = function() {
+          console.log("scope.render");
+          if (scopetableColumnHeadersLabel.length === 0) return;
+          var dataValuesPerTable;
+          //dataValuesPerTable.length = legends.length
+          for ( var k = 0; k < scope.datavalues.length; k++){
+            dataValuesPerTable = scope.datavalues[k];
+            var legends = [];
+            for ( i = 0; i < scope.tableRowHeaders[k].length; i++){
+              legends.push(scope.tableRowHeaders[k][i].name);
+            }
+            //var dataseries= [];
+            var rowvalues=[];
+            var rowsysmlids=[];
+            //var datavalues=[];
+            //var datasysmlids=[];
+            for ( var i = 0; i < dataValuesPerTable.length; i++){
+                var tvalues = [];
+                var sysmlids = [];
 
-                  for ( var j = 0; j < dataValuesPerTable[i].length; j++){
-                    sysmlids[j] =  dataValuesPerTable[i][j].sysmlid;
-                    //datasysmlids.push(dataValuesPerTable[i][j].sysmlid);
-                    if (dataValuesPerTable[i][j].specialization.value[0].type === "LiteralString")
-                      //datavalues.push(Number(dataValuesPerTable[i][j].specialization.value[0].string));
-                      tvalues[j] = dataValuesPerTable[i][j].specialization.value[0].string;
-                    else if (dataValuesPerTable[i][j].specialization.value[0].type === "LiteralReal")
-                      //datavalues.push(Number(dataValuesPerTable[i][j].specialization.value[0].double));
-                      tvalues[j] = dataValuesPerTable[i][j].specialization.value[0].double;
-                    else if (dataValuesPerTable[i][j].specialization.value[0].type === "LiteralInteger")
-                      //datavalues.push(Number(dataValuesPerTable[i][j].specialization.value[0].integer));
-                      tvalues[j] = dataValuesPerTable[i][j].specialization.value[0].integer;
-                  }
-                  rowvalues[i] = tvalues;
-                  rowsysmlids[i] =sysmlids;
-                  //dataseries[i] = tvalues;
-               }
-              chartdata = {
-                id: scope.dataNames[k],//(scope.dataNames[k] !== undefined ? toValidId(scope.dataNames[k]) : "default"),
-                labels: scope.tableColumnHeadersLabel[k],
-                legends: scope.tableRowHeadersLabel[k],
-                colors: udcolors[k],
-                values:rowvalues,//2D array [i][j] where i = rowIndex, j = columnIndex
-                valuesysmlids: rowsysmlids
-               };
-               
-            /* original datavar data = {
-                id: "id123",
-                labels: [
-                  'resilience', 'maintainability', 'accessibility',
-                  'uptime', 'functionality', 'impact'
-                ]
-                series: [
-                  {
-                    label: '2012',
-                    values: [4, 8, 15, 16, 23, 42]
-                  },
-                  {
+                for ( var j = 0; j < dataValuesPerTable[i].length; j++){
+                  sysmlids[j] =  dataValuesPerTable[i][j].sysmlid;
+                  //datasysmlids.push(dataValuesPerTable[i][j].sysmlid);
+                  if (dataValuesPerTable[i][j].specialization.value[0].type === "LiteralString")
+                    //datavalues.push(Number(dataValuesPerTable[i][j].specialization.value[0].string));
+                    tvalues[j] = dataValuesPerTable[i][j].specialization.value[0].string;
+                  else if (dataValuesPerTable[i][j].specialization.value[0].type === "LiteralReal")
+                    //datavalues.push(Number(dataValuesPerTable[i][j].specialization.value[0].double));
+                    tvalues[j] = dataValuesPerTable[i][j].specialization.value[0].double;
+                  else if (dataValuesPerTable[i][j].specialization.value[0].type === "LiteralInteger")
+                    //datavalues.push(Number(dataValuesPerTable[i][j].specialization.value[0].integer));
+                    tvalues[j] = dataValuesPerTable[i][j].specialization.value[0].integer;
+                }
+                rowvalues[i] = tvalues;
+                rowsysmlids[i] =sysmlids;
+                //dataseries[i] = tvalues;
+             }
+            var achartdata = {
+              id: scopedataNames[k],//(scopedataNames[k] !== undefined ? TableService.toValidId(scopedataNames[k]) : "default"),
+              labels: scopetableColumnHeadersLabel[k],
+              legends: legends,
+              colors: udcolors[k],
+              values:rowvalues,//2D array [i][j] where i = rowIndex, j = columnIndex
+              valuesysmlids: rowsysmlids
+             };
+             chartdata[achartdata.id] = achartdata;
+             
+          /* original datavar data = {
+              id: "id123",
+              labels: [
+                'resilience', 'maintainability', 'accessibility',
+                'uptime', 'functionality', 'impact'
+              ]
+              series: [
+                {
+                  label: '2012',
+                  values: [4, 8, 15, 16, 23, 42]
+                },
+                {
 
-                    label: '2013',
-                    values: [12, 43, 22, 11, 73, 25]
-                  },
-                  {
-                    label: '2014',
-                    values: [31, 28, 14, 8, 15, 21]
-                  },]
-              };*/
-              d3.select("."+ chartdata.id).remove();
-              var dataIdDiv = divchart.append('div').attr("class", chartdata.id)
-                                  .attr("style", 'border:1px solid #ddd');
-              createGroupedHorizontalBarChart(chartdata, dataIdDiv);
-              createFilters(chartdata);
-            }//end of k
-          }; //end of render
+                  label: '2013',
+                  values: [12, 43, 22, 11, 73, 25]
+                },
+                {
+                  label: '2014',
+                  values: [31, 28, 14, 8, 15, 21]
+                },]
+            };*/
+            d3.select("."+ achartdata.id).remove();
+            var dataIdDiv = divchart.append('div').attr("class", achartdata.id)
+                                .attr("style", 'border:1px solid #ddd');
+            createGroupedHorizontalBarChart(achartdata, dataIdDiv);
+            createFilters(achartdata);
+          }//end of k
+      }; //end of render
       scope.$watch('datavalues', function(newValue, oldValue) {
+        console.log("scope.watch - datavalues");
         return scope.render();
       },true); 
-      //element is clicked to highlight selected
+
+      
+      scope.$watch('tableRowHeaders', function(newRowHeaders, oldRowHeaders) {
+        console.log("scope.watch - tableRowHeaders");
+        //When a rowHeader is changed, it rquires to change dataIdFilters, too.
+        if ( oldRowHeaders !== undefined){
+          for ( var i = 0; i < newRowHeaders.length; i++ ){
+            for ( var j = 0; j < newRowHeaders[i].length; j++){
+              if ( newRowHeaders[i][j].name !== oldRowHeaders[i][j].name){
+                 //add new one.
+                 dataIdFilters[scopedataNames[i]][0][newRowHeaders[i][j].name] = dataIdFilters[scopedataNames[i]][0][oldRowHeaders[i][j].name];
+                 //delete old one
+                 delete dataIdFilters[scopedataNames[i]][0][oldRowHeaders[i][j].name];
+              }
+            }
+          }
+        }
+        return scope.render();
+      },true); 
+     
+      //rect bar is clicked or table cell (Except rowHeaders) is clicked
       scope.$on('elementSelected', function(event, eid, type) {
           d3.selectAll("rect").transition(200).style("fill-opacity", opacitynotselected);
           d3.selectAll("#"+eid).transition(200).style("fill-opacity", opacityselected);
       });
-      ElementService.getElement(scope.mmsEid, false, ws, version)
-      .then(function(data) {
-        var tableContains = [];
-        var tableNames = [];
-        var tableColumnHeadersLabel=[];
-        var rowHeaders = [];
-
-        for ( var k = 0; k < data.specialization.contains.length; k++ ){
-          if ( data.specialization.contains[k].type ==="Table"){
-            if ( data.specialization.contains[k-1].sourceType==="text")
-              tableNames.push(toValidId(data.specialization.contains[k-1].text.replace("<p>","").replace("</p>","").replace(" ", ""))); //assume it is Paragraph
-            else
-              tableNames.push("default");
-            tableContains.push(data.specialization.contains[k]);
-            rowHeaders = [];
-            //assume first column is empty
-            for ( var kk = 1; kk < data.specialization.contains[k].header[0].length; kk++){
-              rowHeaders[kk-1] = data.specialization.contains[k].header[0][kk].content[0].text.replace("<p>","").replace("</p>","");
-            }  
-            tableColumnHeadersLabel.push(rowHeaders); //xxx, yyy, mass,cost, power in string
-          }
-        }
-        var rowHeadersMmsEid = []; 
-        var dataValuesMmmEid =[];
-        var body;
-        
-        for ( k = 0; k < tableContains.length; k++){
-            body = tableContains[k].body;
-            for (var i = 0; i < body.length; i++ ){
-              rowHeadersMmsEid.push(body[i][0].content[0].source);
-              
-              for ( var j = 1; j < body[i].length; j++){
-                dataValuesMmmEid.push(body[i][j].content[0].source);
-            }
-          }
-        }
-        
-        ElementService.getElements(rowHeadersMmsEid, false, ws, version)
-        .then(function(rowHeaders) {
-                ElementService.getElements(dataValuesMmmEid, false, ws, version)
-                  .then(function(values) {
-                  var dataTableValues = [];
-                  var datavalues = [];
-                  var startIndex = 0;
-                  var counter = 0;
-                  for (k = 0; k < tableContains.length; k++){
-                    datavalues = [];
-                    var valueLength = tableColumnHeadersLabel[k].length* tableContains[k].body.length;
-                    for (i = 0; i < valueLength; i= i + tableColumnHeadersLabel[k].length){
-                      var datarow =[];// new Array(tableColumnHeadersLabel[k].length);
-                      for ( var j = 0; j < tableColumnHeadersLabel[k].length; j++){
-                        datarow.push(values[counter++]); 
-                      }
-                      datavalues.push(datarow);
-                    }
-                    dataTableValues.push(datavalues);
-                  }
-                  var tableRowHeaders=[];
-                  counter = 0;
-                  var numOfRows, eachRowHeader;
-                  for (i = 0; i < dataTableValues.length; i++){
-                    numOfRows = dataTableValues[i].length;
-                    eachRowHeader = [];
-                    for (k = 0; k < numOfRows; k++){
-                        //eachRowHeader.push({'name': rowHeaders[counter++].name, 'checked': true});
-                        eachRowHeader.push(rowHeaders[counter++].name);
-                    }  
-                    tableRowHeaders.push(eachRowHeader);
-                  }
-                  scope.dataNames = tableNames; //[]ss
-                  scope.tableColumnHeadersLabel = tableColumnHeadersLabel; //[]
-                  scope.datavalues = dataTableValues; //[][] - array
-                  scope.tableRowHeadersLabel = tableRowHeaders;
-
-                  //initialize filter
-                  for ( k = 0; k < scope.datavalues.length; k++){
-                    //, legends: scope.tableRowHeadersLabel[k], columns: scope.tableColumnHeadersLabel[k]});   
-                    var filters = [];
-                    var filterlegends = [];
-                    var filterlabels=[];
-                    for ( var i = 0; i < scope.tableRowHeadersLabel[k].length; i++){
-                       filterlegends[toValidId(scope.tableRowHeadersLabel[k][i])] = true;
-                    }
-                    for ( i = 0; i < scope.tableColumnHeadersLabel[k].length; i++){
-                       filterlabels[toValidId(scope.tableColumnHeadersLabel[k][i])] = true;
-                    }
-                   
-                    filters.push(filterlegends);
-                    filters.push(filterlabels);
-                    dataIdFilters[toValidId(tableNames[k])]=filters;
-                  }
-                  
-            });//ElementService.getElements - dataValuesMmEid
-        });//ElementService.getElements - rowHeadersMmsEid
-      }); //end of ElementService
+      
+      TableService.readTables (scope.mmsEid,ws, version)
+         .then(function(value) {
+            scopedataNames = value.dataNames;
+            scopetableColumnHeadersLabel= value.tableColumnHeadersLabels;
+            scope.tableRowHeaders = value.tableRowHeaders;
+            scope.datavalues = value.datavalues; //[][] - array
+            dataIdFilters = value.dataIdFilters;
+      });
+      
     }; //end of link
 
     return {
