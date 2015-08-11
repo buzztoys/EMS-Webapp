@@ -2,8 +2,8 @@
 //http://bl.ocks.org/erikvullings/51cc5332439939f1f292
 'use strict';
  angular.module('mms.directives')
-    .directive('mmsD3GroupedHorizontalBarChartIo', ['ElementService', 'UtilsService', 'TableService','$compile', 'growl','$window', mmsD3GroupedHorizontalBarChartIo]);
-function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, TableService, $compile, growl, $window, mmsViewCtrl) {
+    .directive('mmsD3GroupedHorizontalBarChartIo', ['ElementService', 'UtilsService', 'GTTableService','$compile', 'growl','$window', mmsD3GroupedHorizontalBarChartIo]);
+function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, GTTableService, $compile, growl, $window, mmsViewCtrl) {
       
     var mmsChartLink = function(scope, element, attrs, mmsViewCtrl) {
       console.log("mmsChartLink");
@@ -12,8 +12,9 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, TableSer
 
       var chartdata = [];
       var dataIdFilters = [];
-      var  scopedataNames = [];
-      var  scopetableColumnHeadersLabel= [];
+      var scopedataNames = [];
+      var scopetableColumnHeadersLabel= [];
+      var dataSubValues = [];
       
       element.click(function(e) {
         //stop Propogating event to parent(mms-transclude-doc) element.
@@ -99,10 +100,10 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, TableSer
                 .data(data.legends)
                 .enter()  
                 .append("div")
-                .attr("class", function(d,i){return "legentFilter "+ data.id + " " + TableService.toValidId(d);} )
+                .attr("class", function(d,i){return "legentFilter "+ data.id + " " + GTTableService.toValidId(d);} )
                 .attr("style", function(d,i){return "opacity: " + opacitydefault + ";background-color:" + getColor(data,i) + ";";})
                 .on('mouseover', function (d, i) {
-                    mouseover("."+data.id+"." + TableService.toValidId(d));
+                    mouseover("."+data.id+"." + GTTableService.toValidId(d));
                 })
                 .on('mouseout', function (d, i) {
                     mouseout();
@@ -113,7 +114,7 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, TableSer
                       d3.select(this).append("input")
                         .attr("type", "checkbox")
                         .attr("checked",function(d,i){
-                          if (dataIdFilters[data.id][0][TableService.toValidId(d)] === true)
+                          if (dataIdFilters[data.id][0][GTTableService.toValidId(d)] === true)
                             return true;
                           else 
                             return null;
@@ -123,11 +124,11 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, TableSer
                             // filter by legends
                             console.log(dataIdFilters);
                             console.log("data.id: " + data.id);
-                            console.log("TableService.toValidId(d): " + TableService.toValidId(d));
-                            dataIdFilters[data.id][0][TableService.toValidId(d)] = this.checked;
+                            console.log("GTTableService.toValidId(d): " + GTTableService.toValidId(d));
+                            dataIdFilters[data.id][0][GTTableService.toValidId(d)] = this.checked;
                             createGroupedHorizontalBarChart(chartdata[data.id], null); //2nd argument is not used
                             //handle by visibility
-                            //d3.selectAll(".ghbbar."+ data.id + "." + TableService.toValidId(d) ).style("visibility", this.checked ? "visible": "hidden");
+                            //d3.selectAll(".ghbbar."+ data.id + "." + GTTableService.toValidId(d) ).style("visibility", this.checked ? "visible": "hidden");
                          });
                       d3.select(this).append("span")
                           .text(function (d) {
@@ -144,7 +145,7 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, TableSer
                 .enter()  
                 .append("div")
                 .on('mouseover', function (d, i){
-                      mouseover("."+data.id+"." + TableService.toValidId(d));
+                      mouseover("."+data.id+"." + GTTableService.toValidId(d));
                 })
                 .on('mouseout', function (d, i){
                       mouseout();
@@ -155,17 +156,17 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, TableSer
                     d3.select(this).append("input")
                       .attr("type", "checkbox")
                       .attr("checked", function(d,i){
-                          if (dataIdFilters[data.id][1][TableService.toValidId(d)] === true)
+                          if (dataIdFilters[data.id][1][GTTableService.toValidId(d)] === true)
                             return true;
                           else 
                             return null;
                       })
                       .on("click", function (d) {
                           //filter by columns(labels)
-                          dataIdFilters[data.id][1][TableService.toValidId(d)] = this.checked;     
+                          dataIdFilters[data.id][1][GTTableService.toValidId(d)] = this.checked;     
                           createGroupedHorizontalBarChart(chartdata[data.id], null); //2nd argument is not used
                           //visibility 
-                          //d3.selectAll("." + data.id + "."+ TableService.toValidId(d) ).style("visibility", this.checked ? "visible": "hidden");
+                          //d3.selectAll("." + data.id + "."+ GTTableService.toValidId(d) ).style("visibility", this.checked ? "visible": "hidden");
                        });
                     d3.select(this).append("span")
                         .text(function (d) {
@@ -194,15 +195,15 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, TableSer
               var datalabelsfilter = dataIdFilters[data.id][1];              
               var counter = -1;
               for (var i=0; i<data.labels.length; i++) {
-                if ( datalabelsfilter[TableService.toValidId(data.labels[i])]){
+                if ( datalabelsfilter[GTTableService.toValidId(data.labels[i])]){
                   filteredDataLabels.push(data.labels[i]);
                   for (var j=0; j<data.values.length; j++) { //data.values.length == data.legends.length
                     counter++;
-                    if (datalegendsfilter[TableService.toValidId(data.legends[j])]){
+                    if (datalegendsfilter[GTTableService.toValidId(data.legends[j])]){
                       filteredDataValues.push(Number(data.values[j][i]));
                       filteredDataSysmlids.push(data.valuesysmlids[j][i]);
                       filteredDataColors.push(getColor(data ,counter % data.legends.length));
-                      filteredDataLegends.push(TableService.toValidId(data.legends[j]));
+                      filteredDataLegends.push(GTTableService.toValidId(data.legends[j]));
                     }
                   }
                 }
@@ -257,7 +258,7 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, TableSer
                   .attr("fill", function(d,i) { return filteredDataColors[i]; })
                   .style("fill-opacity", opacitydefault)
                   .attr("class", function(d,i){ 
-                    return "ghbbar "+ data.id + " " + filteredDataLegends[i] + " " + TableService.toValidId(filteredDataLabels[Math.floor(i/filteredDataLegends.length)]);
+                    return "ghbbar "+ data.id + " " + filteredDataLegends[i] + " " + GTTableService.toValidId(filteredDataLabels[Math.floor(i/filteredDataLegends.length)]);
                     })
                   .attr("width", x)
                   .attr("height", barHeight - 1)
@@ -322,7 +323,7 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, TableSer
                   })
                   //.attr("class", function(d,i){ return "ghbbar"+(i % data.series.length);})
                   .on('mouseover', function (d, i){
-                     mouseover("."+ data.id+"."+ TableService.toValidId(d));
+                     mouseover("."+ data.id+"."+ GTTableService.toValidId(d));
                   })
                   .on('mouseout', function (d, i){
                     mouseout();
@@ -331,7 +332,7 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, TableSer
              
               legend.append('rect')
                   //.attr('class', function(d,i){ return 'legendRect' + data.id+ "-" + (i % data.series.length);})
-                  .attr('class', function(d,i){ return 'legendRect ' + data.id+ " " + TableService.toValidId(d);})
+                  .attr('class', function(d,i){ return 'legendRect ' + data.id+ " " + GTTableService.toValidId(d);})
                   .attr('width', legendRectSize)
                   .attr('height', legendRectSize)
                   .style("fill-opacity", opacitydefault)
@@ -350,18 +351,49 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, TableSer
           console.log("scope.render");
           if (scopetableColumnHeadersLabel.length === 0) return;
           var dataValuesPerTable;
+          var dataSubValuesPerTable;
           //dataValuesPerTable.length = legends.length
           for ( var k = 0; k < scope.datavalues.length; k++){
             dataValuesPerTable = scope.datavalues[k];
+            dataSubValuesPerTable = dataSubValues[k];
             var legends = [];
             for ( i = 0; i < scope.tableRowHeaders[k].length; i++){
               legends.push(scope.tableRowHeaders[k][i].name);
             }
             //var dataseries= [];
-            var rowvalues=[];
-            var rowsysmlids=[];
+            
             //var datavalues=[];
             //var datasysmlids=[];
+            console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            console.log(dataSubValuesPerTable);
+            var rowmaxvalues=[];
+            var rowminvalues=[];
+            var minvalues = [];
+            var maxvalues = [];
+            for ( var i1 = 0; i1 < dataSubValuesPerTable.length; i1++){
+               console.log("==========max============");
+               var max = dataSubValuesPerTable[i1].max;
+               var min = dataSubValuesPerTable[i1].min;
+
+
+               for ( var j1 = 0; j1 < max.length; j1++){
+                
+                  if (max[j1].specialization.value[0].type === "LiteralString")
+                    //datavalues.push(Number(dataValuesPerTable[i][j].specialization.value[0].string));
+                    maxvalues[j] = max[j1].specialization.value[0].string;
+                  else if (max[j1].specialization.value[0].type === "LiteralReal")
+                    //datavalues.push(Number(dataValuesPerTable[i][j].specialization.value[0].double));
+                    maxvalues[j] = max[j1].specialization.value[0].double;
+                  else if (max[j1].specialization.value[0].type === "LiteralInteger")
+                    //datavalues.push(Number(dataValuesPerTable[i][j].specialization.value[0].integer));
+                    maxvalues[j] = max[j1].specialization.value[0].integer;
+               }
+               rowmaxvalues[i1] = maxvalues;
+            }
+            console.log("================rowmaxvalues=============================");
+            console.log(rowmaxvalues);
+            var rowvalues=[];
+            var rowsysmlids=[];
             for ( var i = 0; i < dataValuesPerTable.length; i++){
                 var tvalues = [];
                 var sysmlids = [];
@@ -381,10 +413,13 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, TableSer
                 }
                 rowvalues[i] = tvalues;
                 rowsysmlids[i] =sysmlids;
+
                 //dataseries[i] = tvalues;
              }
+             console.log("================rowvalues===================");
+             console.log(rowvalues);
             var achartdata = {
-              id: scopedataNames[k],//(scopedataNames[k] !== undefined ? TableService.toValidId(scopedataNames[k]) : "default"),
+              id: scopedataNames[k],//(scopedataNames[k] !== undefined ? GTTableService.toValidId(scopedataNames[k]) : "default"),
               labels: scopetableColumnHeadersLabel[k],
               legends: legends,
               colors: udcolors[k],
@@ -451,13 +486,16 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, TableSer
           d3.selectAll("#"+eid).transition(200).style("fill-opacity", opacityselected);
       });
       
-      TableService.readTables (scope.mmsEid,ws, version)
+      GTTableService.readTables (scope.mmsEid,ws, version)
          .then(function(value) {
+          console.log("=============Table Service =========");
+          console.log(value);
             scopedataNames = value.dataNames;
             scopetableColumnHeadersLabel= value.tableColumnHeadersLabels;
             scope.tableRowHeaders = value.tableRowHeaders;
             scope.datavalues = value.datavalues; //[][] - array
             dataIdFilters = value.dataIdFilters;
+            dataSubValues = value.datasubvalues;
       });
       
     }; //end of link

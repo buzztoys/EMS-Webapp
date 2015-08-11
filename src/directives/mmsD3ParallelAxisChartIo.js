@@ -369,6 +369,7 @@ function mmsD3ParallelAxisChartIo(ElementService, UtilsService, $compile, growl,
               }
             ]
           };*/
+          console.log(modelData);
       vf_pplot(modelData);
       //console.log(dummyData);
     };//end of render

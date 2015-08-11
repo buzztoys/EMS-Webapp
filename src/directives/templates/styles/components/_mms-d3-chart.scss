@@ -21,12 +21,6 @@
   font-size: 14px;
   font-family: "Helvetica Neue", Helvetica;
 }
-
-#chart {
-  position: absolute;
-  top: 50px;
-  left: 100px;
-}
 /*************************
 .svg-container {
     display: inline-block;
@@ -91,7 +85,7 @@
 	}
 
 /* grouped horizontal bar */
-	.ghbchart .legend {
+	.ghbchart .legend, .graphFilter label {
   fill: black;
   font: 14px sans-serif;
   text-anchor: start;
@@ -110,9 +104,6 @@
   text-anchor: end;
 }
 
-.ghbbar:hover {
-  fill: brown;
-}
 .obpchart .bottomShadingLabelText {
     fill: #000;
     font: 12px sans-serif;
