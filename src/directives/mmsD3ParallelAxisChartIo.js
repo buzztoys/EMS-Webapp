@@ -1,3 +1,4 @@
+
 'use strict';
  angular.module('mms.directives')
     .directive('mmsD3ParallelAxisChartIo', ['ElementService', 'UtilsService','$compile', 'growl','$window', mmsD3ParallelAxisChartIo]);
@@ -432,6 +433,3 @@ function mmsD3ParallelAxisChartIo(ElementService, UtilsService, $compile, growl,
       link: mmsChartLink
     }; //return
 }
-
-
-

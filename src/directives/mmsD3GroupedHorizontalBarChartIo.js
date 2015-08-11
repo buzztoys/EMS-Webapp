@@ -1,3 +1,4 @@
+
 //d3js grouped horizontal bar chart is created by referencing
 //http://bl.ocks.org/erikvullings/51cc5332439939f1f292
 'use strict';
@@ -510,6 +511,3 @@ function mmsD3GroupedHorizontalBarChartIo(ElementService, UtilsService, GTTableS
       link: mmsChartLink
     }; //return
 }
-
-
-

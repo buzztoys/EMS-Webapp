@@ -576,6 +576,3 @@ function mmsD3ObservationProfileChartIo(ElementService, UtilsService, $compile, 
       link: mmsChartLink
     }; //return
 }
-
-
-
