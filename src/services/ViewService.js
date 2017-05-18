@@ -1,7 +1,7 @@
 'use strict';
 
 angular.module('mms')
-.factory('ViewService', ['$q', '$http', 'URLService', 'ElementService', 'UtilsService', 'CacheService', '_', ViewService]);
+.factory('ViewService', ['$q', '$http', '$rootScope','URLService', 'ElementService', 'UtilsService', 'CacheService', ViewService]);
 
 /**
  * @ngdoc service
@@ -20,110 +20,200 @@ angular.module('mms')
  *
  * For View and Product json object schemas, see [here](https://ems.jpl.nasa.gov/alfresco/mms/raml/index.html)
  */
-function ViewService($q, $http, URLService, ElementService, UtilsService, CacheService, _) {
-    var currentViewId = '';
-    var currentDocumentId = '';
+function ViewService($q, $http, $rootScope, URLService, ElementService, UtilsService, CacheService) {
+    var inProgress = {}; //only used for view elements over limit
+
+    // The type of opaque element to the sysmlId of the classifierIds:
+    var TYPE_TO_CLASSIFIER_ID = {
+        Image: "_17_0_5_1_407019f_1430628206190_469511_11978",
+        List: "_17_0_5_1_407019f_1430628190151_363897_11927",
+        Paragraph: "_17_0_5_1_407019f_1430628197332_560980_11953",
+        Table: "_17_0_5_1_407019f_1430628178633_708586_11903",
+        Section: "_17_0_5_1_407019f_1430628211976_255218_12002",
+        ListT: "_17_0_5_1_407019f_1431903739087_549326_12013",
+        TableT: "_17_0_5_1_407019f_1431903724067_825986_11992",
+        Figure: "_17_0_5_1_407019f_1431903748021_2367_12034",  //manual images + timely, etc
+        Equation: "_17_0_5_1_407019f_1431905053808_352752_11992",
+        ParagraphT: "_17_0_5_1_407019f_1431903758416_800749_12055",
+        SectionT: "_18_0_2_407019f_1435683487667_494971_14412"
+    };
+
+    function getClassifierIds() {
+        var re = [];
+        Object.keys(TYPE_TO_CLASSIFIER_ID).forEach(function(key) {
+            re.push(TYPE_TO_CLASSIFIER_ID[key]);
+        });
+        return re;
+    }
+
+    var TYPE_TO_CLASSIFIER_TYPE = {
+        Table: 'TableT',
+        Paragraph: 'ParagraphT',
+        Section: 'SectionT',
+        Comment: 'ParagraphT',
+        List: 'ListT',
+        Image: 'Figure',
+        Equation: 'Equation'
+    };
+
+    var classifierIdsIds = getClassifierIds();
+    var opaqueClassifiers = [TYPE_TO_CLASSIFIER_ID.Image, TYPE_TO_CLASSIFIER_ID.List, 
+        TYPE_TO_CLASSIFIER_ID.Paragraph, TYPE_TO_CLASSIFIER_ID.Section, TYPE_TO_CLASSIFIER_ID.Table];
     
-    /**
-     * @ngdoc method
-     * @name mms.ViewService#getView
-     * @methodOf mms.ViewService
-     * 
-     * @description
-     * Gets a view object by id. 
-     * 
-     * @param {string} id The id of the view to get.
-     * @param {boolean} [update=false] (optional) whether to always get the latest 
-     *      from server, even if it's already in cache (this will update everywhere
-     *      it's displayed, except for the editables)
-     * @param {string} [workspace=master] (optional) workspace to use
-     * @param {string} [version=latest] (optional) alfresco version number or timestamp
-     * @returns {Promise} The promise will be resolved with the view object, 
-     *      multiple calls to this method with the same id would result in 
-     *      references to the same object.
-     */
-    var getView = function(id, update, workspace, version) { 
-        return ElementService.getElement(id, update, workspace, version);
+    var processString = function(values) {
+        if (!values || values.length === 0 || values[0].type !== 'LiteralString')
+            return '';
+        return values[0].value;
+    };
+    var processStrings = function(values) {
+        var res = [];
+        if (!values || values.length === 0)
+            return res;
+        values.forEach(function(value) {
+            if (value.type !== 'LiteralString' || !value.value)
+                return;
+            res.push(value.value);
+        });
+        return res;
+    };
+    var processPeople = function(values) {
+        if (!values || values.length === 0)
+            return [];
+        var people = [];
+        values.forEach(function(value) {
+            if (value.type !== 'LiteralString' || !value.value)
+                return;
+            var p = value.value.split(',');
+            if (p.length !== 5)
+                return;
+            people.push({
+                firstname: p[0],
+                lastname: p[1],
+                title: p[2],
+                orgname: p[3],
+                orgnum: p[4]
+            });
+        });
+        return people;
+    };
+    var processRevisions = function(values) {
+        if (!values || values.length === 0)
+            return [];
+        var rev = [];
+        values.forEach(function(value) {
+            if (value.type !== 'LiteralString' || !value.value)
+                return;
+            var p = value.value.split('|');
+            if (p.length !== 5)
+                return;
+            rev.push({
+                revnum: p[0],
+                date: p[1],
+                firstname: p[2],
+                lastname: p[3],
+                remark: p[4]
+            });
+        });
+        return rev;
+    };
+    var docMetadataTypes = {
+        '_17_0_1_407019f_1326234342817_186479_2256': {
+            name: 'header',
+            process: processString
+        },
+        '_17_0_1_407019f_1326234349580_411867_2258': {
+            name: 'footer',
+            process: processString
+        },
+        '_17_0_2_3_f4a035d_1366647903710_685116_36989': {
+            name: 'dnumber',
+            process: processString
+        },
+        '_17_0_2_3_f4a035d_1366647903991_141146_36990': {
+            name: 'version',
+            process: processString
+        },
+        '_17_0_2_3_f4a035d_1366647903994_494629_36996': {
+            name: 'titlelegal',
+            process: processString
+        },
+        '_17_0_2_3_f4a035d_1366647903994_370992_36997': {
+            name: 'footerlegal',
+            process: processString
+        },
+        '_17_0_2_3_f4a035d_1366647903995_652492_37000': {
+            name: 'authors',
+            process: processPeople
+        },
+        '_17_0_2_3_f4a035d_1366647903996_970714_37001': {
+            name: 'approvers',
+            process: processPeople
+        },
+        '_17_0_2_3_f4a035d_1366647903996_463299_37002': {
+            name: 'concurrences',
+            process: processPeople
+        },
+        '_17_0_2_3_f4a035d_1366698987711_498852_36951': {
+            name: 'revisions',
+            process: processRevisions
+        },
+        '_17_0_2_3_f4a035d_1366696484320_980107_36953': {
+            name: 'project',
+            process: processString
+        },
+        '_17_0_2_3_f4a035d_1366647903995_864529_36998': {
+            name: 'emails',
+            process: processStrings
+        },
+        '_17_0_2_3_e9f034d_1375464775176_680884_29346': {
+            name: 'instlogo',
+            process: processString
+        },
+        '_17_0_2_3_e9f034d_1375464942934_241960_29357': {
+            name: 'inst1',
+            process: processString
+        },
+        '_17_0_2_3_e9f034d_1375464993159_319060_29362': {
+            name: 'inst2',
+            process: processString
+        }
     };
 
     /**
      * @ngdoc method
-     * @name mms.ViewService#getViews
+     * @name mms.ViewService#downgradeDocument
      * @methodOf mms.ViewService
      * 
      * @description
-     * Same as getView, but for multiple ids.
+     * Demote document to a view
      * 
-     * @param {Array.<string>} ids The ids of the views to get.
-     * @param {boolean} [update=false] (optional) whether to always get the latest 
-     *      from server, even if it's already in cache (this will update everywhere
-     *      it's displayed, except for the editables)
-     * @param {string} [workspace=master] (optional) workspace to use
-     * @param {string} [version=latest] (optional) alfresco version number or timestamp
-     * @returns {Promise} The promise will be resolved with an array of view objects, 
-     *      multiple calls to this method with the same ids would result in an array of 
-     *      references to the same objects.
+     * @param {Object} elementOb A document object
+     * @returns {Promise} The promise will be resolved with the downgraded view
      */
-    var getViews = function(ids, update, workspace, version) {
-        return ElementService.getElements(ids, update, workspace, version);
-    };
-
-    /**
-     * @ngdoc method
-     * @name mms.ViewService#getDocument
-     * @methodOf mms.ViewService
-     * 
-     * @description
-     * Gets a document object by id. 
-     * 
-     * @param {string} id The id of the document to get.
-     * @param {boolean} [update=false] (optional) whether to always get the latest 
-     *      from server, even if it's already in cache (this will update everywhere
-     *      it's displayed, except for the editables)
-     * @param {string} [workspace=master] (optional) workspace to use
-     * @param {string} [version=latest] (optional) alfresco version number or timestamp
-     * @returns {Promise} The promise will be resolved with the document object, 
-     *      multiple calls to this method with the same id would result in 
-     *      references to the same object.
-     */
-    var getDocument = function(id, update, workspace, version) {
-        return ElementService.getElement(id, update, workspace, version);
-    };
-
-    /**
-     * @ngdoc method
-     * @name mms.ViewService#updateView
-     * @methodOf mms.ViewService
-     * 
-     * @description
-     * Save view to alfresco and update the cache if successful, the view object
-     * must have an id, and some updated properties. Use this to update view structure
-     * or view to element reference caches.
-     * 
-     * @param {Object} view An object that contains view id and any changes to be saved.
-     * @param {string} [workspace=master] (optional) workspace to use     
-     * @returns {Promise} The promise will be resolved with the updated view
-     */
-    var updateView = function(view, workspace) {
-        return ElementService.updateElement(view, workspace);
-    };
-
-    /**
-     * @ngdoc method
-     * @name mms.ViewService#updateDocument
-     * @methodOf mms.ViewService
-     * 
-     * @description
-     * Save document to alfresco and update the cache if successful, the document object
-     * must have an id, and some updated properties. Use this to update a document's
-     * view hierarchy
-     * 
-     * @param {Object} document An object that contains doc id and any changes to be saved.
-     * @param {string} [workspace=master] (optional) workspace to use
-     * @returns {Promise} The promise will be resolved with the updated doc
-     */
-    var updateDocument = function(document, workspace) {
-        return ElementService.updateElement(document, workspace);
+    var downgradeDocument = function(elementOb) { //TODO fix this to update the aplied stereotype instance
+        var clone = JSON.parse(JSON.stringify(elementOb));
+        clone._appliedStereotypeIds = ['_17_0_1_232f03dc_1325612611695_581988_21583'];
+        return ElementService.updateElement(clone)
+            .then(function(data) {
+                var cacheKey = ['documents', elementOb._projectId, elementOb._refId];
+                var index = -1;
+                var found = false;
+                var projectDocs = CacheService.get(cacheKey);
+                if (projectDocs) {
+                    for (var i = 0; i < projectDocs.length; i++) {
+                        if (projectDocs[i].id === elementOb.id) {
+                            index = i;
+                            break;
+                        }
+                    }
+                    if (index >= 0) {
+                        projectDocs.splice(index, 1);
+                    }
+                }
+                return data;
+            }, function(reason) {
+                return reason;
+            });
     };
 
     /**
@@ -135,29 +225,51 @@ function ViewService($q, $http, URLService, ElementService, UtilsService, CacheS
      * Gets the element objects for elements allowed in this view. The references are 
      * the same as ones gotten from ElementService.
      * 
-     * @param {string} id The id of the view.
+     * @param {object} reqOb see description at ElementService.getElement, where elementId is id of the view
+     * @param {integer} weight the priority of the request
      * @param {boolean} [update=false] (optional) whether to always get the latest 
      *      from server, even if it's already in cache (this will update everywhere
      *      it's displayed, except for the editables)
-     * @param {string} [workspace=master] (optional) workspace to use
-     * @param {string} [version=latest] (optional) alfresco version number or timestamp
      * @returns {Promise} The promise will be resolved with array of element objects. 
      */
-    var getViewElements = function(id, update, workspace, version) {
-        var n = normalize(update, workspace, version);
+    var getViewElements = function(reqOb, weight, update) {
+        UtilsService.normalize(reqOb);
         var deferred = $q.defer();
-        var url = URLService.getViewElementsURL(id, n.ws, n.ver);
-        var cacheKey = ['views', n.ws, id, n.ver, 'elements'];
-        if (CacheService.exists(cacheKey) && !n.update) 
-            deferred.resolve(CacheService.get(cacheKey));
-        else {
-            ElementService.getGenericElements(url, 'elements', n.update, n.ws, n.ver).
-            then(function(data) {
-                deferred.resolve(CacheService.put(cacheKey, data, false));
-            }, function(reason) {
-                deferred.reject(reason);
-            });
+        var key = 'viewElements' + reqOb.projectId + reqOb.refId + reqOb.elementId + reqOb.commitId;
+        if (inProgress[key]) {
+            return inProgress[key];
         }
+        var requestCacheKey = ['elements', reqOb.projectId, reqOb.refId, reqOb.elementId, reqOb.commitId];
+        var cached = CacheService.get(requestCacheKey);
+        if (cached && !update) {
+            deferred.resolve(cached);
+            return deferred.promise;
+        }
+        inProgress[key] = deferred.promise;
+        ElementService.getElement(reqOb, weight, update)
+        .then(function(view) {
+            var toGet = [];
+            var results = [];
+            if (view._displayedElementIds) {
+                var displayed = JSON.parse(view._displayedElementIds);
+                if (angular.isArray(displayed) && displayed.length > 0) {
+                    toGet = displayed;
+                }
+            }
+            reqOb.elementIds = toGet;
+            ElementService.getElements(reqOb, weight, update)
+            .then(function(data) {
+                results = data;
+            }, function(reason) {
+            }).finally(function() {
+                CacheService.put(requestCacheKey, results);
+                deferred.resolve(results);
+                delete inProgress[key];
+            });
+        }, function(reason) {
+            deferred.reject(reason);
+            delete inProgress[key];
+        });
         return deferred.promise;
     };
 
@@ -170,24 +282,21 @@ function ViewService($q, $http, URLService, ElementService, UtilsService, CacheS
      * Gets the view objects for a document. The references are 
      * the same as ones gotten from ElementService.
      * 
-     * @param {string} id The id of the document.
-     * @param {boolean} [update=false] (optional) whether to always get the latest 
-     *      from server, even if it's already in cache (this will update everywhere
-     *      it's displayed, except for the editables)
-     * @param {string} [workspace=master] (optional) workspace to use
-     * @param {string} [version=latest] (optional) alfresco version number or timestamp
+     * @param {object} reqOb see ElementService.getElement
+     * @param {integer} [weight=1] the priority of the request
+     * @param {boolean} [update=false] whether to always get the latest 
+     *      from server
      * @returns {Promise} The promise will be resolved with array of view objects. 
      */
-    var getDocumentViews = function(id, update, workspace, version, simple) {
-        var n = normalize(update, workspace, version);
-        var s = !simple ? false : simple; 
+    var getDocumentViews = function(reqOb, weight, update) {
+        UtilsService.normalize(reqOb);
         var deferred = $q.defer();
-        var url = URLService.getDocumentViewsURL(id, n.ws, n.ver, s);
-        var cacheKey = ['products', n.ws, id, n.ver, 'views'];
-        if (CacheService.exists(cacheKey) && !n.update) 
+        var url = URLService.getDocumentViewsURL(reqOb);
+        var cacheKey = ['views', reqOb.projectId, reqOb.refId, reqOb.elementId];
+        if (CacheService.exists(cacheKey) && !update) {
             deferred.resolve(CacheService.get(cacheKey));
-        else {
-            ElementService.getGenericElements(url, 'views', n.update, n.ws, n.ver).
+        } else {
+            ElementService.getGenericElements(url, reqOb, 'views', weight, update).
             then(function(data) {
                 deferred.resolve(CacheService.put(cacheKey, data, false));
             }, function(reason) {
@@ -199,57 +308,292 @@ function ViewService($q, $http, URLService, ElementService, UtilsService, CacheS
 
     /**
      * @ngdoc method
-     * @name mms.ViewService#addViewToDocument
+     * @name mms.ViewService#addViewToParentView
      * @methodOf mms.ViewService
      *
      * @description
      * This updates a document to include a new view, the new view must be a child
      * of an existing view in the document
      * 
-     * @param {string} viewid Id of the view to add
-     * @param {string} documentId Id of the document to add the view to
-     * @param {string} parentViewId Id of the parent view, this view should 
-     *      already be in the document
-     * @param {string} [workspace=master] workspace to use
-     * @returns {Promise} The promise would be resolved with updated document object
+     * @param {object} reqOb see Element.getElement for description, use parentViewId 
+     *                  and viewId instead of elementId, add 'aggr' key
+     * @returns {Promise} The promise would be resolved with updated parent view object
      */
-    var addViewToDocument = function(viewId, documentId, parentViewId, workspace, viewOb) {
+    var addViewToParentView = function(reqOb) {
+        UtilsService.normalize(reqOb);
         var deferred = $q.defer();
-        var ws = !workspace ? 'master' : workspace;
-        var docViewsCacheKey = ['products', ws, documentId, 'latest', 'views'];
-        getDocument(documentId, workspace)
-        .then(function(data) {  
-            var clone = {};
-            clone.sysmlid = data.sysmlid;
-            clone.read = data.read;
-            clone.specialization = _.cloneDeep(data.specialization);
-            delete clone.specialization.contains;
-            for (var i = 0; i < clone.specialization.view2view.length; i++) {
-                if (clone.specialization.view2view[i].id === parentViewId) {
-                    clone.specialization.view2view[i].childrenViews.push(viewId);
-                    break;
-                }
-            } 
-            clone.specialization.view2view.push({id: viewId, childrenViews: []});
-            updateDocument(clone, workspace)
+        ElementService.getElement({
+            projectId: reqOb.projectId,
+            refId: reqOb.refId,
+            elementId: reqOb.parentViewId
+        }, 2).then(function(data) {  
+            var clone = {
+                _projectId: data._projectId,
+                _refId: data._refId,
+                _modified: data._modified,
+                _read: data._read,
+                id: data.id
+            };
+            if (data._childViews) {
+                clone._childViews = JSON.parse(JSON.stringify(data._childViews));
+            } else {
+                clone._childViews = [];
+            }
+            clone._childViews.push({id: reqOb.viewId, aggregation: reqOb.aggr});
+            ElementService.updateElement(clone, true)
             .then(function(data2) {
-                if (CacheService.exists(docViewsCacheKey) && viewOb)
-                    CacheService.get(docViewsCacheKey).push(viewOb);
                 deferred.resolve(data2);
             }, function(reason) {
-                if (reason.status === 409) {
-                    clone.read = reason.data.elements[0].read;
-                    updateDocument(clone, workspace)
-                    .then(function(data3) {
-                        if (CacheService.exists(docViewsCacheKey) && viewOb)
-                            CacheService.get(docViewsCacheKey).push(viewOb);
-                        deferred.resolve(data3);
-                    }, function(reason2) {
-                        deferred.reject(reason2);
-                    });
-                } else
-                    deferred.reject(reason);
+                deferred.reject(reason);
             });
+        }, function(reason) {
+            deferred.reject(reason);
+        });
+        return deferred.promise;
+    };
+
+    /**
+     * @ngdoc method
+     * @name mms.ViewService#removeViewFromParentView
+     * @methodOf mms.ViewService
+     *
+     * @description
+     * This removes the specified view from the parent view
+     * 
+     * @param {object} reqOb see ElementService.getElement, use viewId and parentViewId
+     * @returns {Promise} The promise would be resolved with updated parent View object
+     */
+    var removeViewFromParentView = function(reqOb) {
+        UtilsService.normalize(reqOb);
+        var deferred = $q.defer();
+        ElementService.getElement({
+            projectId: reqOb.projectId,
+            refId: reqOb.refId,
+            elementId: reqOb.parentViewId
+        }, 2).then(function(data) {  
+            if (data._childViews) {
+                var clone = {
+                    _projectId: data._projectId,
+                    _refId: data._refId,
+                    _modified: data._modified,
+                    _read: data._read,
+                    id: data.id,
+                    _childViews: JSON.parse(JSON.stringify(data._childViews))
+                };
+                for (var i = 0; i < clone._childViews.length; i++) {
+                    if (clone._childViews[i].id === reqOb.viewId) {
+                        clone._childViews.splice(i,1);
+                        break; 
+                    }
+                }
+                ElementService.updateElement(clone, true)
+                .then(function(data2) {
+                    deferred.resolve(data2);
+                }, function(reason) {
+                    deferred.reject(reason);
+                });
+            } else {
+                deferred.resolve(data);
+            }
+        }, function(reason) {
+            deferred.reject(reason);
+        });
+        return deferred.promise;
+    };
+
+    /**
+     * @ngdoc method
+     * @name mms.ViewService#addElementToViewOrSection
+     * @methodOf mms.ViewService
+     *
+     * @description
+     * This updates a view or section to include a new element, the new element must be a child
+     * of an existing element in the view
+     * 
+     * @param {object} reqOb see ElementService.getElement for description, elementId is the view
+     *                          or section instance element id
+     * @param {object} elementOb the element object to add (this should be an instanceValue)
+     * @returns {Promise} The promise would be resolved with updated view or section object
+     */
+    var addElementToViewOrSection = function(reqOb, elementOb) {
+        UtilsService.normalize(reqOb);
+        var deferred = $q.defer();
+        ElementService.getElement(reqOb, 2)
+        .then(function(data) {  
+            var clone = {
+                _projectId: data._projectId,
+                _refId: data._refId,
+                _modified: data._modified,
+                _read: data._read,
+                id: data.id,
+            };
+            var key = '_contents';
+            if (isSection(data)) {
+                key = "specification";
+            }
+            if (data[key]) {
+                clone[key] = JSON.parse(JSON.stringify(data[key]));
+            } else {
+                clone[key] = {
+                    operand: [],
+                    type: "Expression",
+                };
+            }
+            clone[key].operand.push(elementOb);
+            ElementService.updateElement(clone)
+            .then(function(data2) {
+                deferred.resolve(data2);
+            }, function(reason) {
+                deferred.reject(reason);
+            });
+        }, function(reason) {
+            deferred.reject(reason);
+        });
+        return deferred.promise;
+    };
+
+    /**
+     * @ngdoc method
+     * @name mms.ViewService#removeElementFromViewOrSection
+     * @methodOf mms.ViewService
+     *
+     * @description
+     * This removes the specified instanceVal from the contents of the View or Section
+     * 
+     * @param {object} reqOb see ElementService.getElement for description
+     * @param {object} instanceVal to remove from the View or Section
+     * @returns {Promise} The promise would be resolved with updated View or Section object
+     */
+    var removeElementFromViewOrSection = function(reqOb, instanceVal) {
+        UtilsService.normalize(reqOb);
+        var deferred = $q.defer();
+
+        if (instanceVal) {
+            ElementService.getElement(reqOb, 2)
+            .then(function(data) {  
+                var clone = {
+                    _projectId: data._projectId,
+                    _refId: data._refId,
+                    _modified: data._modified,
+                    _read: data._read,
+                    id: data.id,
+                };
+                var key = '_contents';
+                if (isSection(data)) {
+                    key = "specification";
+                }
+                if (data[key]) {
+                    clone[key] = JSON.parse(JSON.stringify(data[key]));
+                } else {
+                    clone[key] = {
+                        operand: [],
+                        type: "Expression",
+                    };
+                }
+                if (clone[key] && clone[key].operand) {
+                    var operands = data[key].operand;
+                    for (var i = 0; i < operands.length; i++) {
+                        if (instanceVal.instanceId === operands[i].instanceId) {
+                            clone[key].operand.splice(i,1);
+                            break; 
+                        }
+                    }
+                }
+                ElementService.updateElement(clone)
+                .then(function(data2) {
+                    deferred.resolve(data2);
+                }, function(reason) {
+                    deferred.reject(reason);
+                });
+            }, function(reason) {
+                deferred.reject(reason);
+            });
+        }
+        return deferred.promise;
+    };
+
+    /**
+     * Adds a InstanceVal/InstanceSpecification to the contents of the View
+     *
+     * @param {object} viewOrSection The View or Section element object to add to
+     * @param {string} type The type of element that is to be created, ie 'Paragraph'
+     * @param {string} [name=Untitled <elementType>] (optional) InstanceSpecification name to use
+     * @param {number} addPeIndex the index of where to add view or section (instance spec) object
+     * @returns {Promise} The promise would be resolved with updated View object if addToView is true
+     *                    otherwise the created InstanceSpecification
+    */
+    var createInstanceSpecification = function(viewOrSectionOb, type, name) {
+        var deferred = $q.defer();
+
+        var newInstanceId = UtilsService.createMmsId();
+        newInstanceId = '_hidden_' + newInstanceId + "_pei";
+
+        var realType = TYPE_TO_CLASSIFIER_TYPE[type];
+        var jsonType = realType;
+        if (type === 'Comment' || type === 'Paragraph')
+            jsonType = type;
+        var instanceSpecSpec = {
+            'type': jsonType, 
+            'sourceType': 'reference', 
+            'source': newInstanceId, 
+            'sourceProperty': 'documentation'
+        };
+        var instanceSpec = {
+            id: newInstanceId,
+            ownerId: 'view_instances_bin_' + viewOrSectionOb._projectId,
+            name: name ? name : "Untitled " + type,
+            documentation: '',
+            type: "InstanceSpecification",
+            classifierIds: [TYPE_TO_CLASSIFIER_ID[realType]],
+            specification: {
+                value: JSON.stringify(instanceSpecSpec),
+                type: "LiteralString"
+            },
+            _appliedStereotypeIds: [],
+        };
+        instanceSpec = UtilsService.createInstanceElement(instanceSpec);
+        if (type === 'Section') {
+            instanceSpec.specification = {
+                operand: [],  
+                type: "Expression"
+            };
+        }
+        var clone = {
+            _projectId: viewOrSectionOb._projectId,
+            id: viewOrSectionOb.id,
+            _refId: viewOrSectionOb._refId,
+        };
+        var key = '_contents';
+        if (isSection(viewOrSectionOb)) {
+            key = "specification";
+        }
+        if (!viewOrSectionOb[key]) {
+            clone[key] = {
+                operand: [],
+                type: "Expression"
+            };
+        } else {
+            clone[key] = JSON.parse(JSON.stringify(viewOrSectionOb[key]));
+        }
+        clone[key].operand.push({instanceId: newInstanceId, type: "InstanceValue"});
+        var toCreate = [instanceSpec, clone];
+        var reqOb = {
+            projectId: viewOrSectionOb._projectId,
+            refId: viewOrSectionOb._refId,
+            elements: toCreate,
+        };
+        ElementService.createElements(reqOb)
+        .then(function(data) {
+            for (var i = 0; i < data.length; i++) {
+                var elem = data[i];
+                if (elem.id === newInstanceId) {
+                    if (type === "Section") {
+                        $rootScope.$broadcast('viewctrl.add.section', elem, viewOrSectionOb);
+                    }
+                    deferred.resolve(elem);
+                    return;
+                }
+            }
         }, function(reason) {
             deferred.reject(reason);
         });
@@ -263,56 +607,139 @@ function ViewService($q, $http, URLService, ElementService, UtilsService, CacheS
      * 
      * @description
      * Create a new view, owner must be specified (parent view), id cannot be specified,
-     * if name isn't specified, "Untitled" will be used, a default contains with 
+     * if name isn't specified, "Untitled" will be used, a default contents with 
      * paragraph of the view documentation will be used. If a document is specified, 
      * will also add the view to the document, in this case the parent view should 
      * already be in the document. The new view will be added as the last child of the 
      * parent view.
      * 
-     * @param {string} ownerId Id of the parent view
-     * @param {string} [name=Untitled] name for the view
-     * @param {string} [documentId] optional document to add to
-     * @param {string} [workspace=master] workspace to use 
+     * @param {object} ownerOb should contain _project and _ref, can be a parent view with _childViews
+     * @param {object} viewOb can specify optional viewId, viewName, viewDoc to be used when
+     *                          creating the new view, boolean isDoc indicate whether it's a document
      * @returns {Promise} The promise will be resolved with the new view. 
      */
-    var createView = function(ownerId, name, documentId, workspace) {
+    var createView = function(ownerOb, viewOb) {
         var deferred = $q.defer();
+
+        var newViewId = viewOb.viewId ? viewOb.viewId : UtilsService.createMmsId();
+        var newInstanceId = '_hidden_' + UtilsService.createMmsId() + '_pei';
+
         var view = {
-            specialization: {type: 'View', contains: []},
-            owner: ownerId,
-            name: !name ? 'Untitled View' : name,
-            documentation: '',
+            id: newViewId,
+            type: 'Class',
+            ownerId: ownerOb.id,
+            _allowedElements: [],
+            _displayedElementIds: [newViewId],
+            _childViews: [],
+            _contents: {
+                operand: [{
+                    instanceId: newInstanceId,
+                    type:"InstanceValue",
+                }],
+                type: 'Expression'
+            },
+            name: viewOb.viewName ? viewOb.viewName : 'Untitled View',
+            documentation: viewOb.viewDoc ? viewOb.viewDoc : '',
+            _appliedStereotypeIds: [
+                (viewOb.isDoc ? "_17_0_2_3_87b0275_1371477871400_792964_43374" : "_17_0_1_232f03dc_1325612611695_581988_21583")
+            ],
+            appliedStereotypeInstanceId: newViewId + '_asi'
         };
-        ElementService.createElement(view, workspace)
+        view = UtilsService.createClassElement(view);
+        var parentView = null;
+        if (ownerOb && (ownerOb._childViews || UtilsService.isView(ownerOb))) {
+            parentView = {
+                _projectId: ownerOb._projectId,
+                _refId: ownerOb._refId,
+                id: ownerOb.id
+            };
+            if (!ownerOb._childViews) {
+                parentView._childViews = [];
+            } else {
+                parentView._childViews = JSON.parse(JSON.stringify(ownerOb._childViews));
+            }
+            parentView._childViews.push({id: newViewId, aggregation: "composite"});
+        }
+        var instanceSpecDoc = '';
+        var instanceSpecSpec = {
+            'type': 'Paragraph', 
+            'sourceType': 'reference', 
+            'source': newInstanceId, 
+            'sourceProperty': 'documentation'
+        };
+        var instanceSpec = {
+            id: newInstanceId,
+            ownerId: 'view_instances_bin_' + ownerOb._projectId,
+            name: "View Documentation",
+            documentation: instanceSpecDoc,
+            type: "InstanceSpecification",
+            classifierIds:[TYPE_TO_CLASSIFIER_ID.ParagraphT],
+            specification: {
+                value: JSON.stringify(instanceSpecSpec),
+                type: "LiteralString"
+            },
+            _appliedStereotypeIds: [],
+        };
+        instanceSpec = UtilsService.createInstanceElement(instanceSpec);
+        var asi = { //create applied stereotype instance
+            id: newViewId + '_asi',
+            ownerId: newViewId,
+            documentation: '',
+            name: '',
+            type: 'InstanceSpecification',
+            classifierIds: [(viewOb.isDoc ? "_17_0_2_3_87b0275_1371477871400_792964_43374" : "_17_0_1_232f03dc_1325612611695_581988_21583")],
+            _appliedStereotypeIds: [],
+            stereotypedElementId: newViewId
+        };
+        asi = UtilsService.createInstanceElement(asi);
+        var toCreate = [instanceSpec, view, asi];
+        if (parentView)
+            toCreate.push(parentView);
+        var reqOb = {
+            projectId: ownerOb._projectId,
+            refId: ownerOb._refId,
+            elements: toCreate,
+            returnChildViews: true
+        };
+        ElementService.createElements(reqOb)
         .then(function(data) {
-            data.specialization.contains = [
-                {
-                    'type': 'Paragraph', 
-                    'sourceType': 'reference', 
-                    'source': data.sysmlid, 
-                    'sourceProperty': 'documentation'
+            data.forEach(function(elem) {
+                if (elem.id === newViewId) {
+                    deferred.resolve(elem);
                 }
-            ];
-            data.specialization.allowedElements = [data.sysmlid];
-            data.specialization.displayedElements = [data.sysmlid];
-            data.specialization.childrenViews = [];
-            ElementService.updateElement(data, workspace)
-            .then(function(data2) {
-                if (documentId) {
-                    addViewToDocument(data.sysmlid, documentId, ownerId, workspace, data2)
-                    .then(function(data3) {
-                        deferred.resolve(data2);
-                    }, function(reason) {
-                        deferred.reject(reason);
-                    });
-                } else
-                    deferred.resolve(data2);
-            }, function(reason) {
-                deferred.reject(reason);
             });
         }, function(reason) {
             deferred.reject(reason);
         });
+        return deferred.promise;
+    };
+
+    /**
+     * @ngdoc method
+     * @name mms.ViewService#createDocument
+     * @methodOf mms.ViewService
+     * 
+     * @description
+     * Create a new document,
+     * if name isn't specified, "Untitled" will be used, a default contents with 
+     * paragraph of the view documentation will be used. 
+     * 
+     * @param {object} ownerOb see createView
+     * @param {object} docOb see createView
+     * @returns {Promise} The promise will be resolved with the new view. 
+     */
+    var createDocument = function(ownerOb, docOb) {
+        var deferred = $q.defer();
+        docOb.isDoc = true;
+        createView(ownerOb, docOb)
+            .then(function(data2) {
+                var cacheKey = ['documents', ownerOb._projectId, ownerOb._refId];
+                if (CacheService.exists(cacheKey))
+                    CacheService.get(cacheKey).push(data2);
+                deferred.resolve(data2);
+            }, function(reason) {
+                deferred.reject(reason);
+            });
         return deferred.promise;
     };
 
@@ -327,17 +754,19 @@ function ViewService($q, $http, URLService, ElementService, UtilsService, CacheS
      * @param {string} site Site name
      * @param {boolean} [update=false] Update latest
      * @param {string} [workspace=master] workspace to use 
+     * @param {string} [version=latest] timestamp
+     * @param {int} weight the priority of the request
      * @returns {Promise} The promise will be resolved with array of document objects 
      */
-    var getSiteDocuments = function(site, update, workspace) {
-        var n = normalize(update, workspace, null);
+    var getProjectDocuments = function(reqOb, weight, update) {
+        UtilsService.normalize(reqOb);
         var deferred = $q.defer();
-        var url = URLService.getSiteProductsURL(site, n.ws);
-        var cacheKey = ['sites', n.ws, site, 'products'];
-        if (CacheService.exists(cacheKey) && !n.update) 
+        var url = URLService.getProjectDocumentsURL(reqOb);
+        var cacheKey = ['documents', reqOb.projectId, reqOb.refId];
+        if (CacheService.exists(cacheKey) && !update) {
             deferred.resolve(CacheService.get(cacheKey));
-        else {
-            ElementService.getGenericElements(url, 'products', n.update, n.ws).
+        } else {
+            ElementService.getGenericElements(url, reqOb, 'documents', weight, update).
             then(function(data) {              
                 deferred.resolve(CacheService.put(cacheKey, data, false));
             }, function(reason) {
@@ -347,42 +776,234 @@ function ViewService($q, $http, URLService, ElementService, UtilsService, CacheS
         return deferred.promise;
     };
 
-    //TODO remove
-    var setCurrentViewId = function(id) {
-        currentViewId = id;
+    /**
+     * @ngdoc method
+     * @name mms.ViewService#getPresentationElementSpec
+     * @methodOf mms.ViewService
+     * 
+     * @description
+     * Parses an instanceSpec of the expression reference tree in the contents
+     * of a View, and returns the corresponding presentation element json object.
+     * 
+     * @param {object} instanceSpec instance specification object
+     * @returns {object} The json object for the corresponding presentation element
+     */
+    var getPresentationElementSpec = function(instanceSpec) {
+        var instanceSpecSpec = instanceSpec.specification;
+        if (!instanceSpecSpec) {
+            return {status: 500, message: 'missing specification'};
+        }
+        var type = instanceSpecSpec.type;
+
+        if (type === 'LiteralString') { // If it is a Opaque List, Paragraph, Table, Image, List:
+            var jsonString = instanceSpecSpec.value;
+            return JSON.parse(jsonString); 
+        } else if (type === 'Expression') { // If it is a Opaque Section, or a Expression:
+            // If it is a Opaque Section then we want the instanceSpec:
+            if (isSection(instanceSpec)) {
+                return instanceSpec;
+            } else { //??
+                return instanceSpecSpec;
+            }
+        }
     };
 
-    var setCurrentDocumentId = function(id) {
-        currentDocumentId = id;
+    /**
+     * @ngdoc method
+     * @name mms.ViewService#getElementReferenceTree
+     * @methodOf mms.ViewService
+     * 
+     * @description
+     * gets the presentation element tree as an array of tree nodes
+     * a tree node is this:
+     * <pre>
+        {
+            instanceId: id of the instance,
+            instanceVal: instanceValue object,
+            sectionElements: array of child tree nodes,
+            instanceSpecification: instance specification object of the instance,
+            presentationElement: json of the presentation element or a section instance spec with type = Section
+        }
+     * </pre>
+     *
+     * @param {object} reqOb see ElementService.getElement
+     * @param {object} contents an expression object from a view or section
+     * @param {int} weight the priority of the request
+     * @returns {Promise} The promise will be resolved with array of tree node objects
+     */
+    var getElementReferenceTree = function(reqOb, contents, weight) {
+        var promises = [];
+        for (var i = 0; i < contents.operand.length; i++) {
+            promises.push(getElementReference(reqOb, contents.operand[i], weight));
+        }
+        return $q.all(promises);
     };
 
-    var getCurrentViewId = function() {
-        return currentViewId;
+    var getElementReference = function(reqOb, instanceVal, weight) {
+        var deferred = $q.defer();
+
+        var elementObject = {};
+
+        elementObject.instanceId = instanceVal.instanceId;
+        elementObject.instanceVal = instanceVal;
+        elementObject.sectionElements = [];
+
+        var req = JSON.parse(JSON.stringify(reqOb));
+        req.elementId = instanceVal.instanceId;
+        ElementService.getElement(req, weight)
+        .then(function(instanceSpecification) {
+            elementObject.instanceSpecification = instanceSpecification;
+            if (instanceSpecification.classifierIds &&
+                    instanceSpecification.classifierIds.length > 0 && 
+                    opaqueClassifiers.indexOf(instanceSpecification.classifierIds[0]) >= 0) {
+                elementObject.isOpaque = true;
+            } else {
+                elementObject.isOpaque = false;
+            }
+            var presentationElement = getPresentationElementSpec(instanceSpecification);
+            elementObject.presentationElement = presentationElement;
+            if (isSection(presentationElement)) {
+                getElementReferenceTree(req, presentationElement.specification)
+                .then(function(sectionElementReferenceTree) {
+                    elementObject.sectionElements = sectionElementReferenceTree;
+                    deferred.resolve(elementObject);
+                }, function(reason) {
+                    deferred.reject(reason);
+                });
+            } else
+                deferred.resolve(elementObject);
+        }, function(reason) {
+            deferred.reject(reason);
+        });
+        return deferred.promise;
     };
 
-    var getCurrentDocumentId = function() {
-        return currentDocumentId;
+    /**
+     * @ngdoc method
+     * @name mms.ViewService#isSection
+     * @methodOf mms.ViewService
+     * 
+     * @description
+     * Returns true if the passed InstanceSpecification is a Section
+     * 
+     * @param {Object} instanceSpec A InstanceSpecification json object
+     * @returns {boolean} whether it's a section
+     */
+    var isSection = function(instanceSpec) {
+        return instanceSpec.classifierIds && 
+               instanceSpec.classifierIds.length > 0 &&
+               (instanceSpec.classifierIds[0] === TYPE_TO_CLASSIFIER_ID.Section ||
+                instanceSpec.classifierIds[0] === TYPE_TO_CLASSIFIER_ID.SectionT);
     };
 
-    var normalize = function(update, workspace, version) {
-        return UtilsService.normalize({update: update, workspace: workspace, version: version});
+    var isTable = function(instanceSpec) {
+        return instanceSpec.classifierIds && 
+               instanceSpec.classifierIds.length > 0 &&
+               (instanceSpec.classifierIds[0] === TYPE_TO_CLASSIFIER_ID.Table ||
+                instanceSpec.classifierIds[0] === TYPE_TO_CLASSIFIER_ID.TableT);
     };
 
+    var isFigure = function(instanceSpec) {
+        return instanceSpec.classifierIds && 
+               instanceSpec.classifierIds.length > 0 &&
+               (instanceSpec.classifierIds[0] === TYPE_TO_CLASSIFIER_ID.Figure ||
+                instanceSpec.classifierIds[0] === TYPE_TO_CLASSIFIER_ID.Image);
+    };
+
+    var isEquation = function(instanceSpec) {
+        return instanceSpec.classifierIds && 
+               instanceSpec.classifierIds.length > 0 &&
+               instanceSpec.classifierIds[0] === TYPE_TO_CLASSIFIER_ID.Equation;
+    };
+
+    var getTreeType = function(instanceSpec) {
+        if (isSection(instanceSpec))
+            return 'section';
+        if (isTable(instanceSpec))
+            return 'table';
+        if (isFigure(instanceSpec))
+            return 'figure';
+        if (isEquation(instanceSpec))
+            return 'equation';
+        return null;
+    };
+
+    /**
+     * @ngdoc method
+     * @name mms.ViewService#getDocMetadata
+     * @methodOf mms.ViewService
+     * 
+     * @description
+     * gets Document properties from docgen's stereotypes
+     *
+     * @param {object} reqOb see ElementService.getElement
+     * @param {integer} weight the priority of the request
+     * @returns {Promise} The promise will be resolved with metadata object
+     *                      with name value pairs corresponding to document stereotype
+     */
+    var getDocMetadata = function(reqOb, weight) {
+        var deferred = $q.defer();
+        var metadata = {};
+        reqOb.depth = 2;
+        //ElementService.search(docid, ['id'], null, null, null, null, ws, weight)
+        ElementService.getOwnedElements(reqOb, weight)
+        .then(function(data) {
+            if (data.length === 0) {
+                return;
+            }
+            for (var i = 0; i < data.length; i++) {
+                var prop = data[i];
+                var feature = prop.definingFeatureId ? prop.definingFeatureId : null;
+                var value = prop.value ? prop.value : null;
+                if (!feature || !docMetadataTypes[feature] || !value || value.length === 0) {
+                    continue;
+                }
+                metadata[docMetadataTypes[feature].name] = docMetadataTypes[feature].process(value);
+            }
+        }, function(reason) {
+        }).finally(function() {
+            deferred.resolve(metadata);
+        });
+        return deferred.promise;
+    };
+
+    var isPresentationElement = function(e) {
+        if (e.type === 'InstanceSpecification') {
+            var classifierIdss = e.classifierIds;
+            if (classifierIdss.length > 0 && classifierIdsIds.indexOf(classifierIdss[0]) >= 0) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    var reset = function() {
+        inProgress = {};
+    };
+    
     return {
-        getView: getView,
-        getViews: getViews,
-        getDocument: getDocument,
-        updateView: updateView,
-        updateDocument: updateDocument,
         getViewElements: getViewElements,
         createView: createView,
-        addViewToDocument: addViewToDocument,
+        createDocument: createDocument,
+        downgradeDocument: downgradeDocument,
+        addViewToParentView: addViewToParentView,
         getDocumentViews: getDocumentViews,
-        getSiteDocuments: getSiteDocuments,
-        setCurrentViewId: setCurrentViewId,
-        setCurrentDocumentId: setCurrentDocumentId,
-        getCurrentViewId: getCurrentViewId,
-        getCurrentDocumentId: getCurrentDocumentId
+        getProjectDocuments: getProjectDocuments,
+        getPresentationElementSpec: getPresentationElementSpec,
+        isSection: isSection,
+        isFigure: isFigure,
+        isTable: isTable,
+        isEquation: isEquation,
+        getTreeType: getTreeType,
+        isPresentationElement: isPresentationElement,
+        addElementToViewOrSection: addElementToViewOrSection,
+        removeElementFromViewOrSection: removeElementFromViewOrSection,
+        removeViewFromParentView: removeViewFromParentView,
+        createInstanceSpecification: createInstanceSpecification,
+        TYPE_TO_CLASSIFIER_ID: TYPE_TO_CLASSIFIER_ID,
+        getElementReferenceTree : getElementReferenceTree,
+        getDocMetadata: getDocMetadata,
+        reset: reset
     };
 
 }

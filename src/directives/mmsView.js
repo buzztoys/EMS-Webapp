@@ -1,20 +1,22 @@
 'use strict';
 
 angular.module('mms.directives')
-.directive('mmsView', ['ViewService', '$templateCache', 'growl', mmsView]);
+.directive('mmsView', ['ViewService', 'ElementService', '$templateCache', '$rootScope', 'growl', mmsView]);
 
 /**
  * @ngdoc directive
  * @name mms.directives.directive:mmsView
  *
  * @requires mms.ViewService
+ * @requires mms.ElementService
  * @requires $templateCache
+ * @requires growl
  *
  * @restrict E
  *
  * @description
  * Given a view id, renders the view according to the json given by mms.ViewService
- * The view have a text edit mode, where transclusions can be clicked. The view's last 
+ * The view has a text edit mode, where transclusions can be clicked. The view's last 
  * modified time and author is the latest of any transcluded element modified time. 
  * For available api methods, see methods section.
  *
@@ -36,70 +38,151 @@ angular.module('mms.directives')
  *  <pre>
     <div ng-controller="ViewCtrl">
         <button ng-click="showComments()">Show Comments</button>
-        <mms-view mms-vid="view_element_id" mms-cf-clicked="handler(elementId)" mms-view-api="api"></mms-view>
+        <mms-view mms-element-id="view_element_id" mms-project-id="view_project_id" mms-cf-clicked="handler(elementId)" mms-view-api="api"></mms-view>
     </div>
     </pre>
- * ## Example view at a certain time
+ * ## Example view at a certain commit
  *  <pre>
-    <mms-view mms-vid="view_element_id" mms-version="2014-07-01T08:57:36.915-0700"></mms-view>
+    <mms-view mms-element-id="view_element_id" mms-project-id="view_project_id" mms-commit-id="COMMIT_ID_HASH"></mms-view>
     </pre>
  *
- * @param {string} mmsVid The id of the view
- * @param {string=master} mmsWs Workspace to use, defaults to master
- * @param {string=latest} mmsVersion Version can be alfresco version number or timestamp, default is latest
- * @param {expression=} mmsCfClicked The expression to handle transcluded elements 
- *     in the view being clicked, this should be a function whose argument is 'elementId'
+ * @param {string} mmsElementId The id of the view
+ * @param {string} mmsProjectId The project id for the view
+ * @param {string=master} mmsRefId Reference to use, defaults to master
+ * @param {string=latest} mmsCommitId Commit ID, default is latest
+ * @param {expression=} mmsCfClicked The expression to handle transcluded elements in the
+ *              view being clicked, this should be a function whose argument is 'elementId'
  */
-function mmsView(ViewService, $templateCache, growl) {
+
+function mmsView(ViewService, ElementService, $templateCache, $rootScope, growl) {
     var template = $templateCache.get('mms/templates/mmsView.html');
 
     var mmsViewCtrl = function($scope) {
-        this.getViewElements = function() {
-            return ViewService.getViewElements($scope.mmsVid, false, $scope.mmsWs, $scope.mmsVersion);
+        $scope.presentationElemCleanUpFncs = [];
+
+        this.isTranscludedElement = function(elementName) {
+            if (elementName === 'MMS-TRANSCLUDE-COM' ||
+                elementName === 'MMS-TRANSCLUDE-DOC' ||
+                elementName === 'MMS-TRANSCLUDE-IMG' ||
+                elementName === 'MMS-TRANSCLUDE-NAME' ||
+                elementName === 'MMS-TRANSCLUDE-VAL') {
+                return true;
+            }
+            return false;
         };
-        this.transcludeClicked = function(elementId) {
-            if ($scope.mmsCfClicked)
-                $scope.mmsCfClicked({elementId: elementId});
+
+        this.isViewElement = function(elementName) {
+            if (elementName === 'MMS-VIEW-IMG' ||
+                elementName === 'MMS-VIEW-LIST' ||
+                elementName === 'MMS-VIEW-PARA' ||
+                elementName === 'MMS-VIEW-TABLE' ||
+                elementName === 'MMS-VIEW-TABLE-T' ||
+                elementName === 'MMS-VIEW-LIST-T' ||
+                elementName === 'MMS-VIEW-EQUATION') {
+                return true;
+            }
+            return false;
         };
-        this.elementTranscluded = function(elem) {
-            if (elem.modified > $scope.modified) { 
-                $scope.modified = elem.modified;
-                $scope.creator = elem.creator;
+
+        this.isPresentationElement = function(elementName) {
+            if (elementName === 'MMS-VIEW-PRESENTATION-ELEM') {
+                return true;
+            }
+            return false;
+        };
+
+        this.isEditable = function() {
+            return $scope.showEdits;
+        };
+
+        this.transcludeClicked = function(elementOb) {
+            if ($scope.mmsViewApi && $scope.mmsViewApi.elementClicked)
+                $scope.mmsViewApi.elementClicked(elementOb);
+        };
+
+        this.elementTranscluded = function(elem, type) {
+            if (elem) {
+                if (elem._modified > $scope.modified && type !== 'Comment') {
+                    $scope.modified = elem._modified;
+                    if (elem._modifier)
+                        $scope.modifier = elem._modifier;
+                }
+                if ($scope.mmsViewApi && $scope.mmsViewApi.elementTranscluded)
+                    $scope.mmsViewApi.elementTranscluded(elem, type);
             }
         };
-        this.getWsAndVersion = function() {
+
+        //INFO this was getWsAndVersion
+        this.getElementOrigin = function() {
             return {
-                workspace: $scope.mmsWs, 
-                version: $scope.mmsVersion
+                projectId: $scope.mmsProjectId,
+                refId: $scope.mmsRefId,
+                commitId: $scope.mmsCommitId
             };
+        };
+
+        this.getView = function() {
+            // scope view gets set in the viewlink fnc
+            return $scope.view;
         };
     };
 
     var mmsViewLink = function(scope, element, attrs) {
+        // Build request object
+        var reqOb = {elementId: scope.mmsElementId, projectId: scope.mmsProjectId, refId: scope.mmsRefId, commitId: scope.mmsCommitId};
+
         var processed = false;
+        
+        scope.isSection = false;
         var changeView = function(newVal, oldVal) {
             if (!newVal || (newVal === oldVal && processed))
                 return;
             processed = true;
-            ViewService.getView(scope.mmsVid, false, scope.mmsWs, scope.mmsVersion)
+            element.addClass('isLoading');
+            ElementService.getElement(reqOb, 1)
             .then(function(data) {
-                ViewService.getViewElements(scope.mmsVid, false, scope.mmsWs, scope.mmsVersion)
+                //view accepts a section element
+                if (data.type === 'InstanceSpecification') {
+                    scope.isSection = true;
+                    scope.view = data;
+                    scope.modified = data._modified;
+                    scope.modifier = data._modifier;
+                    return;
+                }
+                if (data._numElements && data._numElements > 5000 &&
+                        scope.mmsCommitId && scope.mmsCommitId !== 'latest') {
+                    //threshold where getting view elements in bulk takes too long and it's not latest
+                    //getting cached individual elements should be faster
+                    scope.view = data;
+                    scope.modified = data._modified;
+                    scope.modifier = data._modifier;
+                    return;
+                }
+                ViewService.getViewElements(reqOb, 1)
                 .then(function(data2) {
                     scope.view = data;
-                    scope.modified = data.modified;
-                    scope.creator = data.creator;
+                    scope.modified = data._modified;
+                    scope.modifier = data._modifier;
                 }, function(reason) {
                     scope.view = data;
-                    scope.modified = data.modified;
-                    scope.creator = data.creator;
+                    scope.modified = data._modified;
+                    scope.modifier = data._modifier;
+                }).finally(function() {
+                    element.removeClass('isLoading');
                 });
             }, function(reason) {
-                growl.error('Getting View Error: ' + reason.message + ': ' + scope.mmsVid);
+                growl.error('Getting View Error: ' + reason.message + ': ' + scope.mmsElementId);
+            }).finally(function() {
+                if (scope.view)
+                    element.removeClass('isLoading');
             });
         };
-        scope.$watch('mmsVid', changeView);
+        scope.$watch('mmsElementId', changeView);
         scope.showElements = false;
         scope.showComments = false;
+        scope.showEdits = false;
+
+
         /**
          * @ngdoc function
          * @name mms.directives.directive:mmsView#toggleShowElements
@@ -112,6 +195,7 @@ function mmsView(ViewService, $templateCache, growl) {
             scope.showElements = !scope.showElements;
             element.toggleClass('editing');
         };
+
         /**
          * @ngdoc function
          * @name mms.directives.directive:mmsView#toggleShowComments
@@ -125,9 +209,30 @@ function mmsView(ViewService, $templateCache, growl) {
             element.toggleClass('reviewing');
         };
 
+        /**
+         * @ngdoc function
+         * @name mms.directives.directive:mmsView#toggleShowEdits
+         * @methodOf mms.directives.directive:mmsView
+         * 
+         * @description 
+         * toggle elements editing panel 
+         */
+        scope.toggleShowEdits = function() {
+            scope.showEdits = !scope.showEdits;
+
+            // Call the callback functions to clean up frames, show edits, and
+            // re-open frames when needed:
+            for (var i = 0; i < scope.presentationElemCleanUpFncs.length; i++) {
+                scope.presentationElemCleanUpFncs[i]();
+            }
+        };
+
         if (angular.isObject(scope.mmsViewApi)) {
             var api = scope.mmsViewApi;
             api.toggleShowElements = scope.toggleShowElements;
+            api.toggleShowEdits = scope.toggleShowEdits;
+            api.toggleShowComments = scope.toggleShowComments;
+
             /**
              * @ngdoc function
              * @name mms.directives.directive:mmsView#setShowElements
@@ -145,7 +250,7 @@ function mmsView(ViewService, $templateCache, growl) {
                 else
                     element.removeClass('editing');
             };
-            api.toggleShowComments = scope.toggleShowComments;
+
             /**
              * @ngdoc function
              * @name mms.directives.directive:mmsView#setShowComments
@@ -163,9 +268,14 @@ function mmsView(ViewService, $templateCache, growl) {
                 else
                     element.removeClass('reviewing');
             };
+
             api.changeView = function(vid) {
                 scope.changeView(vid);
             };
+
+            if (api.init) {
+                api.init(api);
+            }
         }
     };
 
@@ -173,12 +283,13 @@ function mmsView(ViewService, $templateCache, growl) {
         restrict: 'E',
         template: template,
         scope: {
-            mmsVid: '@',
-            mmsWs: '@',
-            mmsVersion: '@',
+            mmsElementId: '@',
+            mmsProjectId: '@',
+            mmsRefId: '@',
+            mmsCommitId: '@',
             mmsNumber: '@',
-            mmsCfClicked: '&',
-            mmsViewApi: '='
+            mmsLink: '<',
+            mmsViewApi: '<'
         },
         controller: ['$scope', mmsViewCtrl],
         link: mmsViewLink

@@ -77,7 +77,7 @@
     angular.module('exampleApp', ['mms', 'mms.directives']);
     </pre>
  */
-angular.module('mms.directives', ['mms', 'mms.directives.tpls', 'ui.bootstrap', 'ui.sortable', 'angular-growl'])
+angular.module('mms.directives', ['mms', 'mms.directives.tpls', 'ui.bootstrap', 'angular-growl'])
 .config(['$sceProvider', 'growlProvider', function($sceProvider, growlProvider) {
     $sceProvider.enabled(false);
     growlProvider.onlyUniqueMessages(false);
@@ -85,4 +85,5 @@ angular.module('mms.directives', ['mms', 'mms.directives.tpls', 'ui.bootstrap', 
     growlProvider.globalPosition('bottom-right');
 }])
 .constant('go', window.go)
-.constant('tinymce', window.tinymce);
+.constant('CKEDITOR', window.CKEDITOR)
+.constant('MathJax', window.MathJax);

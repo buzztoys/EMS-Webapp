@@ -59,12 +59,50 @@ thead td, table caption {
   tr {
     @include transition($background_hover_transition);
   }
+}
 
-  td {
-    border-top: 1px solid $tertiary_grey;
-    border-bottom: 1px solid $tertiary_grey;
+.content-table {
+  @extend .table;
+  @extend .table-condensed;
+  @extend .table-bordered;
+  p {
+    margin: 0px 0px 5px;
   }
 }
+
+// Workaround for tables with no borders
+.table[border='0']{
+
+  border: 0;
+  // Cells
+  > thead,
+  > tbody,
+  > tfoot {
+    > tr {
+      > th,
+      > td {
+        border: none;
+      }
+    }
+  }
+
+  // Remove top border from thead by default
+  > caption + thead,
+  > colgroup + thead,
+  > thead:first-child {
+    > tr:first-child {
+      > th,
+      > td {
+        border: 0;
+      }
+    }
+  }
+  // Account for multiple tbody instances
+  > tbody + tbody {
+    border-top: none;
+  }
+}
+
 
 .tooltip {
   .tooltip-inner {
@@ -83,4 +121,8 @@ thead td, table caption {
       border-bottom-color: #000;
     }
   }
+}
+
+.star-mandatory {
+  color: $red;
 }

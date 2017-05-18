@@ -16,10 +16,6 @@
 /* App level customizations */
 @import "base/_mms-globals.scss";
 
-/* Layout directive customizations */
-@import "layout/_mms-nav.scss";
-@import "layout/_mms-footer.scss";
-
 /* Other customizations */
 @import "components/_mms-buttons.scss";
 @import "components/_mms-tree.scss";
@@ -30,6 +26,8 @@
 @import "components/_mms-view.scss";
 @import "components/_mms-cf-modal.scss";
 @import "components/_mms-redactor.scss";
-@import "components/_mms-tinymce.scss";
+@import "components/_mms-editor.scss";
 @import "components/_mms-misc-components.scss";
-@import "components/_mms-d3-chart.scss";
+@import "components/_mms-autocomplete-modal.scss";
+@import "components/_mms-history.scss";
+@import "../../charts/_mms-d3-chart.scss";

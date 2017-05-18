@@ -37,7 +37,7 @@ angular.module('mms')
  */
 function urlService(baseUrl) {
     var root = baseUrl;
-
+    var ticket;
     /**
      * @ngdoc method
      * @name mms.URLService#isTimestamp
@@ -50,124 +50,105 @@ function urlService(baseUrl) {
      * @returns {boolean} Returns true if the string has '-' in it
      */
     var isTimestamp = function(version) {
-        if (String(version).indexOf('-') >= 0)
+        if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}[+]?-\d{4}$/.test(version.trim()))
             return true;
         return false;
+        
+        // if (String(version).indexOf('-') >= 0)
+        //     return true;
+        // return false;
     };
 
     /**
      * @ngdoc method
-     * @name mms.URLService#getConfigSnapshotsURL
+     * @name mms.URLService#getMmsVersionURL
+     * @methodOf mms.URLService
+     * 
+     * @description
+     * self explanatory
+     *
+     * @returns {object} Returns object with mmsversion
+     */
+    var getMmsVersionURL = function() {
+        return addTicket(root + "/mmsversion");
+    };
+
+    /**
+     * @ngdoc method
+     * @name mms.URLService#getHtmlToPdfURL
      * @methodOf mms.URLService
      *
      * @description
-     * Gets url that gets or posts snapshots for a configuration in a site
+     * Gets url that to convert HTML to PDF
      *
-     * @param {string} id Id of the configuration
+     * @param {string} docId Id of the document
      * @param {string} site Site name
      * @param {string} workspace Workspace name
      * @returns {string} The url
      */
-    var getConfigSnapshotsURL = function(id, site, workspace) {
-        return root + "/workspaces/" + workspace +
-                      "/sites/" + site +
-                      "/configurations/" + id +
-                      "/snapshots";                
+    var getHtmlToPdfURL = function(docId, projectId, refId) {
+        return addTicket(root + "/projects/" + projectId +
+                      "/refs/" + refId +
+                      "/documents/" + docId +
+                      "/htmlToPdf/123456789");  
     };
 
     /**
      * @ngdoc method
-     * @name mms.URLService#getProductSnapshotsURL
+     * @name mms.URLService#getCheckLoginURL
      * @methodOf mms.URLService
      *
      * @description
-     * Gets url that gets or creates snapshots for a product in a site
+     * Gets url that checks the login
      *
-     * @param {string} id Id of the product
-     * @param {string} site Site name
-     * @param {string} workspace Workspace name
      * @returns {string} The url
      */
-    var getProductSnapshotsURL = function(id, site, workspace) {
-        return root + "/workspaces/" + workspace +
-                      "/sites/" + site +
-                      "/products/" + id +
-                      "/snapshots";                
+    var getCheckLoginURL = function() {
+        return root + "/checklogin";
+    };
+
+    var getOrgsURL = function() {
+        return addTicket(root + "/orgs");
+    };
+
+    var getProjectsURL = function(orgId) {
+        if (orgId)
+            return addTicket(root + "/orgs/" + orgId + '/projects');
+        return addTicket(root + '/projects');
+    };
+
+    var getProjectURL = function(projectId) {
+        return addTicket(root + "/projects/" + projectId);
+    };
+
+    var getRefsURL = function(projectId) {
+        return addTicket(root + '/projects/' + projectId + '/refs');
+    };
+
+    var getRefURL = function(projectId, refId) {
+        return addTicket(root + '/projects/' + projectId + '/refs/' + refId);
+    };
+
+    var getGroupsURL = function(projectId, refId) {
+        return addTicket(root + '/projects/' + projectId + '/refs/' + refId + '/groups');
     };
 
     /**
      * @ngdoc method
-     * @name mms.URLService#getSiteConfigsURL
-     * @methodOf mms.URLService
-     *
-     * @description
-     * Gets url that gets or creates configurations in a site
-     *
-     * @param {string} site Site name
-     * @param {string} workspace Workspace name
-     * @returns {string} The url
-     */
-    var getSiteConfigsURL = function(site, workspace) {
-        return root + "/workspaces/" + workspace +
-                      "/sites/" + site +
-                      "/configurations";
-    };
-
-    /**
-     * @ngdoc method
-     * @name mms.URLService#getConfigProductsURL
-     * @methodOf mms.URLService
-     *
-     * @description
-     * Gets url that gets or posts products in a configuration
-     *
-     * @param {string} id Id of the configuration
-     * @param {string} site Site name
-     * @param {string} workspace Workspace name
-     * @returns {string} The url
-     */
-    var getConfigProductsURL = function (id, site, workspace) {
-        return root + "/workspaces/" + workspace +
-                      "/sites/" + site +
-                      "/configurations/" + id +
-                      "/products";                        
-    };
-
-    /**
-     * @ngdoc method
-     * @name mms.URLService#getConfigURL
-     * @methodOf mms.URLService
-     *
-     * @description
-     * Gets url that gets a configuration
-     *
-     * @param {string} id Id of the configuration
-     * @param {string} site Site name
-     * @param {string} workspace Workspace name
-     * @returns {string} The url
-     */
-    var getConfigURL = function(id, site, workspace) {
-        return root + "/workspaces/" + workspace + 
-                      "/sites/" + site + 
-                      "/configurations/" + id;
-    };
-
-    /**
-     * @ngdoc method
-     * @name mms.URLService#getConfigProductsURL
+     * @name mms.URLService#getSiteProductsURL
      * @methodOf mms.URLService
      *
      * @description
      * Gets url that gets products in a site
      *
-     * @param {string} site Site name
-     * @param {string} workspace Workspace name
+     * @param {object} reqOb object with keys as described in ElementService.
      * @returns {string} The url
      */
-    var getSiteProductsURL = function(site, workspace) {
-        return root + "/workspaces/" + workspace + 
-                      "/sites/" + site + 
-                      "/products";
+    var getProjectDocumentsURL = function(reqOb) {
+        var r = root + "/projects/" + reqOb.projectId + 
+                      "/refs/" + reqOb.refId + 
+                      "/documents";
+        return addExtended(addTicket(addVersion(r, reqOb.commitId)), reqOb.extended);
     };
 
     /**
@@ -176,17 +157,15 @@ function urlService(baseUrl) {
      * @methodOf mms.URLService
      * 
      * @description
-     * Gets the url for querying an image url 
+     * Gets the url for querying an image url
      * (this is not the actual image path)
      * 
-     * @param {string} id The id of the image
-     * @param {string} workspace Workspace name
-     * @param {string} version Timestamp or version number
      * @returns {string} The path for image url queries.
      */
-    var getImageURL = function(id, workspace, version) {
-        var r = root + '/workspaces/' + workspace + '/artifacts/' + id;
-        return addVersion(r, version);
+    var getImageURL = function(reqOb) {
+        var r = root + '/projects/' + reqOb.projectId + '/refs/' + reqOb.refId + '/artifacts/' +
+                       reqOb.elementId + '?accept=' + reqOb.accept;
+        return addTicket(addVersion(r, reqOb.commitId));
     };
 
     /**
@@ -201,7 +180,7 @@ function urlService(baseUrl) {
      * @returns {string} The path for site dashboard.
      */
     var getSiteDashboardURL = function(site) {
-        return "/share/page/site/" + site + "/dashboard";
+        return addTicket("/share/page/site/" + site + "/dashboard");
     };
 
     /**
@@ -211,23 +190,26 @@ function urlService(baseUrl) {
      * 
      * @description
      * Gets the path for an element
-     * 
-     * @param {string} id The element id.
-     * @param {string} workspace Workspace name
-     * @param {string} version Timestamp or version number
+     *
+     * @param {object} reqOb object with keys as described in ElementService.
      * @returns {string} The url.
      */
-    var getElementURL = function(id, workspace, version) {        
-        var r = root + '/workspaces/' + workspace + '/elements/' + id;
-        return addVersion(r, version);
+    var getElementURL = function(reqOb) {        
+        var r = root + '/projects/' + reqOb.projectId + '/refs/' + reqOb.refId + '/elements/' + reqOb.elementId;
+        return addExtended(addTicket(addVersion(r, reqOb.commitId)), reqOb.extended);
     };
 
-    var getOwnedElementURL = function(id, workspace, version) {
-        
-        var r = root + '/workspaces/' + workspace + '/elements/' + id + '?recurse=true';
-        // TODO return addVersion(r, version);
-        return r;
-        
+    var getOwnedElementURL = function(reqOb) {
+        var recurseString = 'recurse=true';
+        if (reqOb.depth)
+            recurseString = 'depth=' + reqOb.depth;
+        var r = root + '/projects/' + reqOb.projectId + '/refs/' + reqOb.refId + '/elements/' + reqOb.elementId;
+        r = addVersion(r, reqOb.commitId);
+        if (r.indexOf('?') > 0)
+            r += '&' + recurseString;
+        else
+            r += '?' + recurseString;
+        return addTicket(addExtended(r, reqOb.extended));        
     };
 
     /**
@@ -237,42 +219,15 @@ function urlService(baseUrl) {
      * 
      * @description
      * Gets the url to get all views in a document
-     * 
-     * @param {string} id The document id.
-     * @param {string} workspace Workspace name
-     * @param {string} version Timestamp or version number
+     *
+     * @param {object} reqOb object with keys as described in ElementService.
      * @returns {string} The url.
      */
-    var getDocumentViewsURL = function(id, workspace, version, simple) {
-        var r = root + "/javawebscripts/products/" + id + "/views";
-        //var r = root + "/workspaces/" + workspace + "/products/" + id + "/views";
-        r = addVersion(r, version);
-        if (simple) {
-            if (r.indexOf('?') > 0)
-                r += '&simple=true';
-            else
-                r += '?simple=true';
-        }
-        return r;
-    };
-
-    /**
-     * @ngdoc method
-     * @name mms.URLService#getViewElementsURL
-     * @methodOf mms.URLService
-     * 
-     * @description
-     * Gets the url to get all elements referenced in a view
-     * 
-     * @param {string} id The view id.
-     * @param {string} workspace Workspace name
-     * @param {string} version Timestamp or version number
-     * @returns {string} The url.
-     */
-    var getViewElementsURL = function(id, workspace, version) {
-        var r = root + "/javawebscripts/views/" + id + "/elements";
-        //var r = root + "/workspaces/" + workspace + "/views/" + id + "/elements";
-        return addVersion(r, version);
+    var getDocumentViewsURL = function(reqOb) {
+        var r = root + "/projects/" + reqOb.projectId + "/refs/" + reqOb.refId + 
+            '/documents/' + reqOb.elementId + "/views";
+        r = addVersion(r, reqOb.commitId);
+        return addExtended(addTicket(r), reqOb.extended);
     };
 
     /**
@@ -282,14 +237,12 @@ function urlService(baseUrl) {
      * 
      * @description
      * Gets the url to query for element history
-     * 
-     * @param {string} id The element id.
-     * @param {string} workspace Workspace name
+     *
+     * @param {object} reqOb object with keys as described in ElementService.
      * @returns {string} The url.
      */
-    var getElementVersionsURL = function(id, workspace) {
-        return root + "/javawebscripts/elements/" + id + "/versions";
-        //return root + '/workspaces/' + workspace + '/elements/' + id + '/versions';
+    var getElementHistoryURL = function(reqOb) {
+        return addTicket(root + '/projects/' + reqOb.projectId + '/refs/' + reqOb.refId + '/elements/' + reqOb.elementId + '/history');
     };
 
     /**
@@ -299,12 +252,28 @@ function urlService(baseUrl) {
      * 
      * @description
      * Gets the path for posting element changes.
-     * 
-     * @param {string} workspace Workspace name
+     *
+     * @param {object} reqOb object with keys as described in ElementService.
      * @returns {string} The post elements url.
      */
-    var getPostElementsURL = function(workspace) {
-        return root + '/workspaces/' + workspace + '/elements';
+    var getPostElementsURL = function(reqOb) {
+        return addExtended(addChildViews(addTicket(root + '/projects/' + reqOb.projectId + '/refs/' + reqOb.refId + '/elements'), reqOb.returnChildViews), reqOb.extended);
+    };
+
+    /**
+     * @ngdoc method
+     * @name mms.URLService#getPutElementsURL
+     * @methodOf mms.URLService
+     * 
+     * @description
+     * Gets the path for getting multiple elements (using put with body).
+     *
+     * @param {object} reqOb object with keys as described in ElementService.
+     * @returns {string} The post elements url.
+     */
+    var getPutElementsURL = function(reqOb) {
+        var r = root + '/projects/' + reqOb.projectId + '/refs/' + reqOb.refId + '/elements';
+        return addExtended(addTicket(addVersion(r, reqOb.commitId)), reqOb.extended);
     };
 
     /**
@@ -335,29 +304,26 @@ function urlService(baseUrl) {
         var result = {status: status, data: data};
         if (status === 404)
             result.message = "Not Found";
-        else if (status === 500)
-            result.message = "Server Error";
-        else if (status === 401 || status === 403)
+        else if (status === 500) {
+            if (angular.isString(data) && data.indexOf("ENOTFOUND") >= 0)
+                result.message = "Network Error (Please check network)";
+            else
+                result.message = "Server Error";
+        } else if (status === 401 || status === 403)
             result.message = "Permission Error";
         else if (status === 409)
             result.message = "Conflict";
-        else
-            result.message = "Failed";
+        else if (status === 400)
+            result.message = "Bad Request";
+        else if (status === 410)
+            result.message = "Deleted";
+        else if (status === 408)
+            result.message = "Timed Out";
+        else if (status === 501) {
+            result.message = "Cacheing";
+        } else
+            result.message = "Timed Out (Please check network)";
         deferred.reject(result);
-    };
-
-    /**
-     * @ngdoc method
-     * @name mms.URLService#getSitesURL
-     * @methodOf mms.URLService
-     * 
-     * @description
-     * Gets the url to query sites.
-     * 
-     * @returns {string} The url.
-     */
-    var getSitesURL = function() {
-        return root + "/rest/sites";
     };
 
     /**
@@ -367,62 +333,151 @@ function urlService(baseUrl) {
      * 
      * @description
      * Gets the url for element keyword search.
-     * 
-     * @param {string} query Keyword query
-     * @param {string} workspace Workspace name to search under
+     *
+     * @param {object} reqOb object with keys as described in ElementService.
      * @returns {string} The post elements url.
      */
-    var getElementSearchURL = function(query, workspace) {
-        return root + "/javawebscripts/element/search?keyword=" + query;
+    var getElementSearchURL = function(reqOb) {
+        var r = root + '/projects/' + reqOb.projectId + '/refs/' + reqOb.refId + '/search';
+        return addExtended(addTicket(r), true);
     };
 
-    var getWorkspacesURL = function() {
-        return root + '/workspaces';
-    };
-
-    var getWorkspaceURL = function(ws) {
-        return root + '/workspaces/' + ws;
-    };
-
-    var getWsDiffURL = function(ws1, ws2, ws1time, ws2time) {
-        var r = root + '/diff?sourceWs=' + ws2 + '&targetWs=' + ws2;
-        if (ws1time && ws1time !== 'latest')
-            r += '&sourceTimestamp=' + ws1time;
+    var getWsDiffURL = function(ws1, ws2, ws1time, ws2time, recalc) {
+        var diffUrl =  root + '/diff/' + ws1 + '/' + ws2 + '/' + ws1time + '/' + ws2time  + '?background=true';
+        if(recalc === true) diffUrl += '&recalculate=true';
+        
+        return addTicket(diffUrl);
+        /*if (ws1time && ws1time !== 'latest')
+            r += '&timestamp1=' + ws1time;
         if (ws2time && ws2time !== 'latest')
-            r += '&targetTimestamp=' + ws2time;
+            r += '&timestamp2=' + ws2time;
+        return r;*/
     };
 
+    var getPostWsDiffURL = function(sourcetime) {
+        var r = root + '/diff';
+        if (sourcetime && isTimestamp(sourcetime))
+            r += '?timestamp2=' + sourcetime;
+        return addTicket(r);
+    };
+    
+    var getJobs = function(id) {
+        return addTicket(root + '/workspaces/master/jobs/' + id + '?recurse=1');
+    };
+
+    var getJob = function(jobSyml){
+        return addTicket(root + '/workspaces/master/jobs/' + jobSyml);
+    };
+
+    var getJenkinsRun = function(jobSyml) {
+        return addTicket(root + '/workspaces/master/jobs/'+ jobSyml + '/execute');
+    };
+    
+    var getCreateJob = function() {
+        var link = '/alfresco/service/workspaces/master/jobs';
+        return addTicket(root + '/workspaces/master/jobs');
+    };
+
+    var getLogoutURL = function() {
+        return addTicket(root + '/api/login/ticket/' + ticket);
+    };
+    
+    var getCheckTicketURL = function(t) {
+        return root + '/mms/login/ticket/' + t;//+ '?alf_ticket=' + t; //TODO remove when server returns 404
+    };
+    
     var addVersion = function(url, version) {
         if (version === 'latest')
             return url;
-        if (isTimestamp(version))
-            return url + '?timestamp=' + version;
+        else if (version) {
+            if (url.indexOf('?') > 0)
+                return url + '&commitId=' + version;
+            else
+                return url + '?commitId=' + version;
+        } 
+        return url;
+    };
+
+    var addTicket = function(url) {
+        var r = url;
+        if (!ticket)
+            return r;
+        if (r.indexOf('commitId') > 0) //TODO check mms cache rules
+            return r;
+        if (r.indexOf('?') > 0)
+            r += '&alf_ticket=' + ticket;
         else
-            return url + '/versions/' + version;
+            r += '?alf_ticket=' + ticket;
+        return r;    
+    };
+
+    var addExtended = function(url, extended) {
+        var r = url;
+        if (!extended)
+            return r;
+        if (r.indexOf('?') > 0)
+            r += '&extended=true';
+        else
+            r += '?extended=true';
+        return r;
+    };
+
+    var addChildViews = function(url, add) {
+        var r = url;
+        if (!add)
+            return r;
+        if (r.indexOf('?') > 0)
+            r += '&childviews=true';
+        else
+            r += '?childviews=true';
+        return r;
+    };
+
+    var getRoot = function() {
+        return root;
+    };
+
+    var setTicket = function(t) {
+        ticket = t;
+    };
+    
+    var getJMSHostname = function(){
+        return root + '/connection/jms';
     };
 
     return {
+        getMmsVersionURL: getMmsVersionURL,
         getSiteDashboardURL: getSiteDashboardURL,
+        getOrgsURL: getOrgsURL,
+        getProjectsURL: getProjectsURL,
+        getProjectURL: getProjectURL,
+        getRefsURL: getRefsURL,
+        getRefURL: getRefURL,
+        getGroupsURL: getGroupsURL,
         getElementURL: getElementURL,
-        getOwnedElementURL: getOwnedElementURL,
-        getElementVersionsURL: getElementVersionsURL,
+        getPutElementsURL: getPutElementsURL,
         getPostElementsURL: getPostElementsURL,
-        handleHttpStatus: handleHttpStatus,
-        getSitesURL: getSitesURL,
+        getOwnedElementURL: getOwnedElementURL,
+        getElementHistoryURL: getElementHistoryURL,
         getElementSearchURL: getElementSearchURL,
-        getImageURL: getImageURL,
-        getProductSnapshotsURL: getProductSnapshotsURL,
-        getConfigSnapshotsURL: getConfigSnapshotsURL,
-        getSiteProductsURL: getSiteProductsURL,
-        getConfigURL: getConfigURL,
-        getSiteConfigsURL: getSiteConfigsURL,
-        getConfigProductsURL : getConfigProductsURL,
+        getProjectDocumentsURL: getProjectDocumentsURL,
         getDocumentViewsURL: getDocumentViewsURL,
-        getViewElementsURL: getViewElementsURL,
+        handleHttpStatus: handleHttpStatus,
+        getImageURL: getImageURL,
+        getHtmlToPdfURL: getHtmlToPdfURL,
         getWsDiffURL: getWsDiffURL,
-        getWorkspacesURL: getWorkspacesURL,
-        getWorkspaceURL: getWorkspaceURL,
-        isTimestamp: isTimestamp
+        getPostWsDiffURL: getPostWsDiffURL,
+        getJobs: getJobs,
+        getJob: getJob,
+        getJenkinsRun: getJenkinsRun,
+        getCreateJob: getCreateJob,
+        getCheckLoginURL: getCheckLoginURL,
+        getCheckTicketURL: getCheckTicketURL,
+        getLogoutURL: getLogoutURL,
+        isTimestamp: isTimestamp,
+        getRoot: getRoot,
+        setTicket: setTicket,
+        getJMSHostname: getJMSHostname
     };
 
 }

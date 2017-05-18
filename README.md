@@ -1,4 +1,8 @@
 # angular-mms
+
+## Usage
+https://github.com/Open-MBEE/EMS-Webapp/blob/opensource/Documents/ViewEditorUserGuide-OpenMBEE.pdf
+
 ## File Structure
 * /package.json - node module dependencies for building
 * /Gruntfile.js - buildfile
@@ -11,16 +15,31 @@
 
 ## Building and Running (also see links below)
 
-* install node.js
-* install ruby
-* install grunt (_sudo npm install -g grunt-cli_)
-* install bower (_sudo npm install -g bower_)
-* install sass (_gem install sass_)
-* cd into angular-mms root dir
-* _npm install_ (install all node module dependencies specified in package.json - these will install into a local node_modules folder)
-* _grunt_ - default task - this will create a dist and build directory, the dist contains concatenated and minified versions of our module js code and css, build directory contains all necessary files to run the application from a server
-* _grunt server:ems_ - does the default, plus runs a webserver at localhost:9000 out of /build and a proxy server that proxies to ems for any path starting with /alfresco. This allows us to test with real service endpoint (there are other options like server:a, server:b that proxies to europaems-dev-staging-a and europaems-dev-staging-b)
-* _grunt clean_ - deletes dist and build folders
+1. install node.js at version 4 (this project is not proven compatible with v7+ yet) and its associated version of npm
+2. install grunt (_sudo npm install -g grunt-cli_)
+3. install bower (_sudo npm install -g bower_)
+4. cd into angular-mms root dir
+5. _npm install_ (install all node module dependencies specified in package.json - these will install into a local node_modules folder)
+6. add file named `angular-mms-grunt-servers.json`. This is where you will add server mappings.  
+    * The _grunt_ command will build with these default and fake values, but will not be runnable.  
+    * You should update "ems" key to point to the value of the **actual** hostname serving the Model Management Server (MMS).
+```json
+{
+  "ems": "hostnameurl"
+}
+```
+7. 
+  * _grunt_ - default task - this will create a dist and build directory, the dist contains concatenated and minified versions of our module js code and css, build directory contains all necessary files to run the application from a server
+  * _grunt server:ems_ - does the default, plus runs a webserver at localhost:9000 out of /build and a proxy server that proxies to ems for any path starting with /alfresco. This allows us to test with real service endpoints when defined in `angular-mms-grunt-servers.json` like _grunt server:a_ or _grunt server:b_ .  e.g.:
+```json
+{
+  "ems": "hostnameurl",
+   "a": "europaems-dev-staging-a",
+   "b": "europaems-dev-staging-b"
+}
+```
+8. (optional) _grunt clean_ - deletes dist and build folders
+
 
 ## Problems?
 If you see some error after updating, try cleaning out the bower_components and bower_components_target folders under /app and do a _grunt clean_
@@ -29,7 +48,27 @@ If you see some error after updating, try cleaning out the bower_components and 
 If you're sure everything is right, try running _bower cache clean_
 
 ## Testing
-_grunt karma_ - Runs our current service unit tests under /test/unit/ServiceSpecs
+Run:
+
+        npm install -g protractor
+        webdriver-manager update
+        
+To execute Karma tests manually use
+
+        ./node_modules/karma/bin/karma start config/develop/karma.develop.conf.js
+
+To avoid typing ./node_modules/karma/bin/karma everytime, install karma-cli globally, then karma should automatically use local karma
+
+        npm install -g karma-cli
+        karma start config/develop/karma.develop.conf.js
+        
+To execute Protractor tests
+
+        protractor config/develop/protractor.develop.conf.js
+        
+For Karma - place new tests within test/develop/unit/DirectiveSpecs or test/develop/unit/ServiceSpecs
+
+For Protractor - place new tests within test/develop/e2e
 
 ## Generating Docs
 * _grunt ngdocs_ - this would generate html docs based on code comments written in ngdocs style into docs/. The generated files need to be served through a webserver to work.
@@ -99,6 +138,8 @@ Put core directives under /src/directives. These should all be prefixed with mms
 To use this on an html page, use
         
         <mms-element-name data-mms-id="someid"></mms-element-name>
+
+For a more complex template, put your template html in /src/directives/templates and they will be picked up in the compile process, and put into the $templateCache as 'mms/templates/template.html' (see other mms directives for examples or consult the angular docs)
         
 There are many more directive options to make complex directives, consult the Angular docs or other mms directives for examples.
 
@@ -138,12 +179,15 @@ Put test pages under /app. The current build will look through bower dependencie
         angular.module('myApp', ['mms', 'mms.directives']);
         //declare module dependencies
 
+### customize pdf css
+see src/services/UtilsService.getPrintCss
+[princexml](https://www.princexml.com/)
+
 ## Links
-* [EMS Web Apps Alfresco Site](https://ems.jpl.nasa.gov/share/page/site/ems-web-apps/dashboard)
 * [node.js](http://nodejs.org/)
 * [grunt](http://gruntjs.com/)
 * [sass](http://sass-lang.com/)
 * [ngdocs](https://github.com/idanush/ngdocs/wiki/API-Docs-Syntax)
 * [grunt-ngdocs](https://github.com/m7r/grunt-ngdocs)
 * [jasmine](http://jasmine.github.io/)
-* [karma](http://karma-runner.github.io/0.12/index.html)
+* [karma](http://karma-runner.github.io/0.12/index.html)# angularLessons

@@ -9,12 +9,12 @@
 
   &.fa-pane-orientation-horizontal {
     .fa-pane-handle > .fa-pane-toggle {
-      @include box-shadow(-2px 0 2px 0px rgba(100,100,100,0.4));
+      @include box-shadow(-2px 0 2px 0px rgba(100, 100, 100, 0.4));
       margin-left: 1px;
     }
   }
 
-  .container-snapshots { 
+  .container-snapshots {
     h1 {
       font-family: $light-font-family-sans-serif;
       font-weight: 200;
@@ -39,6 +39,33 @@
 
       .create-new-snapshot-btn {
         margin-right: 4px;
+      }
+    }
+  }
+}
+
+.diff-pane-right {
+  > .pane-right {
+    @include box-shadow(-1px 0px 5px 0px rgba(0, 0, 0, 0.4));
+    z-index: 1;
+  }
+
+  &.fa-pane-orientation-horizontal {
+    .fa-pane-handle > .fa-pane-toggle {
+      @include box-shadow(-2px 0 2px 0px rgba(100, 100, 100, 0.4));
+      margin-left: 1px;
+    }
+  }
+
+  ul.abn-tree {
+    cursor: default;
+
+    .shaft,
+    .shaft-hidden:hover {
+      background: inherit;
+
+      i {
+        cursor: pointer;
       }
     }
   }
