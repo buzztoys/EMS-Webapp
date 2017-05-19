@@ -16,9 +16,10 @@ function TableService($q, $http, URLService, UtilsService, CacheService, _, Elem
      *
      * @param {string} mmsEid SysML ID of a table instance
      */
-    var readTableCols = function(mmsEid, ws, version) {
+    var readTableCols = function(reqOb, ws, version) {
       var deferred = $q.defer();
-      ElementService.getElement(mmsEid, false, ws, version)
+      //ElementService.getElement(mmsEid, false, ws, version)
+      ElementService.getElement(reqOb, 1, true)
       .then(function(data) {
         var ids = [];
         var columns = [];
@@ -98,10 +99,10 @@ function TableService($q, $http, URLService, UtilsService, CacheService, _, Elem
       return deferred.promise;
     };
 
-    var readTables = function(mmsEid, ws, version) {
+    var readTables = function(reqOb, ws, version) {
       var deferred = $q.defer();
 
-      ElementService.getElement(mmsEid, false, ws, version)
+      ElementService.getElement(reqOb, 1, false)
       .then(function(data) {
 
         var tableTitles = []; //used only for display
@@ -110,17 +111,35 @@ function TableService($q, $http, URLService, UtilsService, CacheService, _, Elem
         var numOfDataColumn = []; //to know the number of data columns in case not column header lables.
         var numOfRowHeadersPerTable = [];
         var rowHeadersMmsEid = [];
+        rowHeadersMmsEid.elementIds =[];
+        rowHeadersMmsEid.projectId = reqOb.projectId;
+        rowHeadersMmsEid.refId = reqOb.refId;
+        rowHeadersMmsEid.commitId = reqOb.commitId;
+    
+
         var dataValuesMmmEid =[];
+        dataValuesMmmEid.elementIds = [];
+        dataValuesMmmEid.projectId = reqOb.projectId;
+        dataValuesMmmEid.refId = reqOb.refId;
+        dataValuesMmmEid.commitId = reqOb.commitId;
+
         var columnCounter;
         var i, j, k;
         if ( data._contents !==  undefined){ //use contents if exist
         //if ( data.specialization.contains ===  undefined){  
           var tempMmsEid = [];
+          tempMmsEid.elementIds = [];
+          //tempMmsEid.projectIds = [];
+          tempMmsEid.projectId = reqOb.projectId;
+          tempMmsEid.refId = reqOb.refId;
+          tempMmsEid.commitId = reqOb.commitId;
           for ( k = 0; k < data._contents.operand.length; k++ ){
-            tempMmsEid.push(data._contents.operand[k].instanceId);
+            tempMmsEid.elementIds.push(data._contents.operand[k].instanceId);
           }
-          ElementService.getElements(tempMmsEid, false, ws, version)
+    
+          ElementService.getElements(tempMmsEid, 1, false)
             .then(function(values) {
+
               for ( k = 0; k < values.length; k++){
                 var s = JSON.parse(values[k].specification.value);
                 if ( s.type === "Table"){
@@ -136,9 +155,9 @@ function TableService($q, $http, URLService, UtilsService, CacheService, _, Elem
                   }
                   numOfRowHeadersPerTable.push(s.body.length);
                   for ( i = 0; i < s.body.length; i++){
-                    rowHeadersMmsEid.push(s.body[i][0].content[0].source);
+                    rowHeadersMmsEid.elementIds.push(s.body[i][0].content[0].source);
                     for ( j = 1; j < s.body[i].length; j++ ){
-                      dataValuesMmmEid.push(s.body[i][j].content[0].source);
+                      dataValuesMmmEid.elementIds.push(s.body[i][j].content[0].source);
                     }
                     if (i === 0)
                       columnCounter = s.body[i].length - 1; //-1 to remove row header
@@ -177,9 +196,9 @@ function TableService($q, $http, URLService, UtilsService, CacheService, _, Elem
               body = tableContains[k].body;
               numOfRowHeadersPerTable.push( body.length);
               for (i = 0; i < body.length; i++ ){
-                rowHeadersMmsEid.push(body[i][0].content[0].source);
+                rowHeadersMmsEid.elementIds.push(body[i][0].content[0].source);
                 for ( j = 1; j < body[i].length; j++){
-                  dataValuesMmmEid.push(body[i][j].content[0].source);
+                  dataValuesMmmEid.elementIds.push(body[i][j].content[0].source);
                 if ( i === 0)
                   columnCounter = body[i].length - 1;// -1 to remove row header
               }
@@ -193,9 +212,10 @@ function TableService($q, $http, URLService, UtilsService, CacheService, _, Elem
         //common function to read 2.2 and previous version JSON
         function readTablesCommon(){
           var numOfTables = tableIds.length;
-          ElementService.getElements(rowHeadersMmsEid, false, ws, version)
+
+          ElementService.getElements(rowHeadersMmsEid, 1, false)
           .then(function(rowHeaders) {
-              ElementService.getElements(dataValuesMmmEid, false, ws, version)
+              ElementService.getElements(dataValuesMmmEid, 1, false)
                 .then(function(values) {
                   var dataIdFilters=[];
                   var dataTableValues = [];

@@ -14,13 +14,22 @@ function mmsC3(ElementService, UtilsService, TableService, $compile, growl, $win
     var processed = false;
     var ws = scope.mmsWs;
     var version = scope.mmsVersion;
-    if (mmsViewCtrl) {
-        var viewVersion = mmsViewCtrl.getWsAndVersion();
-        if (!ws)
-            ws = viewVersion.workspace;
-        if (!version)
-            version = viewVersion.version;
-    }
+ 
+  var projectId;
+  var refId;
+  var commitId;
+        
+  if (mmsViewCtrl) {
+                var viewVersion = mmsViewCtrl.getElementOrigin();
+                if (!projectId)
+                    projectId = viewVersion.projectId;
+                if (!refId)
+                    refId = viewVersion.refId;
+                if (!commitId)
+                    commitId = viewVersion.commitId;
+            }
+
+
     function vf_pplot(_columns, _index, _is_x_value_number, _has_column_header) {
 
       svg.append('div').attr("id", 'c3chart' + scope.$id + _index);
@@ -802,8 +811,10 @@ function mmsC3(ElementService, UtilsService, TableService, $compile, growl, $win
     var scopetableColumnHeadersLabel= [];
     var dataIdFilters = [];
 
-    
-    TableService.readTables (scope.mmsEid, ws, version)
+    var reqOb = {elementId: scope.mmsEid, projectId: projectId, refId: refId, commitId: commitId};
+
+    //TableService.readTables (scope.mmsEid, ws, version)
+    TableService.readTables (reqOb, ws, version)
       .then(function(value) {
         scopeTableTitles = value.tableTitles;
         scopeTableIds = value.tableIds;
