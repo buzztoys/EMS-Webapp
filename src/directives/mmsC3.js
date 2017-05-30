@@ -34,13 +34,17 @@ function mmsC3(ElementService, UtilsService, TableService, $compile, growl, $win
 
       svg.append('div').attr("id", 'c3chart' + scope.$id + _index);
       
-      var c3json = {
-         bindto: '#c3chart' + scope.$id + _index,
-         data: {
+      var  c3json = {
+           bindto: '#c3chart' + scope.$id + _index,
+          data: {
           //columns:  _columns, //including column heading
-        }
-      };
-      
+          }
+        };  
+
+      console.log("=========0====================");   
+      var json0 = JSON.stringify(c3json);
+      console.log(json0);
+          
       if (scope.c3dataurl){
         c3json.data.url = scope.c3dataurl;
       }
@@ -63,6 +67,11 @@ function mmsC3(ElementService, UtilsService, TableService, $compile, growl, $win
         if(_has_column_header === true && scope.c3dataxs === undefined && scope.c3axisxcategories === undefined)
           c3json.data.x = 'x'; 
       }
+      console.log("=========1====================");
+      var json1 = JSON.stringify(c3json);
+      console.log(json1);
+    
+
       //Chart
       if ( scope.c3sizewidth){
         if (c3json.size === undefined) c3json.size = {};
@@ -154,12 +163,21 @@ function mmsC3(ElementService, UtilsService, TableService, $compile, growl, $win
       if (scope.c3dataclasses)
         c3json.data.classes = JSON.parse( scope.c3dataclasses.replace(/'/g, '"')); 
       
+      console.log("=========2===================");
+      var json2 = JSON.stringify(c3json);
+      console.log(json2);
+    
+      
+
       if (scope.c3datalabelsformat){
         if (c3json.data.labels === undefined) c3json.data.labels = {};
         c3json.data.labels.format = eval("(" + scope.c3datalabelsformat + ")");
+        console.log("2aaaaaaaaaa");
       }
-      else if (scope.c3datalabels)
+      else if (scope.c3datalabels) {
         c3json.data.labels = eval("(" + scope.c3datalabels + ")");
+        console.log("2bbbbbbbbbbbbb");
+      }
       if ( scope.c3dataorder){ //pie and docut -asc not working
         if ( scope.c3dataorder === "null")
           c3json.data.order = null;
@@ -216,15 +234,24 @@ function mmsC3(ElementService, UtilsService, TableService, $compile, growl, $win
         if (c3json.axis.x === undefined) c3json.axis.x = {};
         c3json.axis.x.show = eval("(" + scope.c3axisxshow  + ")");
       }
+
+      console.log("=========2x===================");
+      var json2x = JSON.stringify(c3json);
+      console.log(json2x);
+    
+      
+
       if (scope.c3axisxtype){ //timeseries, category, or indexed
         if (c3json.axis === undefined) c3json.axis = {};
         if (c3json.axis.x === undefined) c3json.axis.x = {};
         c3json.axis.x.type = scope.c3axisxtype; 
+        console.log("aaaaaaaaa");
       }
       else if (_has_column_header === true && _is_x_value_number === false && scope.c3dataxs === undefined){ //row 1 is heading but not numbers (column0 is ignored)
            if (c3json.axis === undefined)  c3json.axis = {};
            if (c3json.axis.x === undefined) c3json.axis.x = {};
            c3json.axis.x.type = 'category';
+           console.log("bbbbbbbbbbbbb");
       }
       if (scope.c3axisxlocaltime){
         if (c3json.axis === undefined) c3json.axis = {};
@@ -628,6 +655,10 @@ function mmsC3(ElementService, UtilsService, TableService, $compile, growl, $win
         if (c3json.bar.width === undefined) c3json.bar.width = {};
         c3json.bar.width = scope.c3barwidth;
       } 
+      console.log("=========3====================");
+      var json3 = JSON.stringify(c3json);
+      console.log(json3);
+    
       if ( scope.c3barwidthratio !== undefined){
         if (c3json.bar === undefined ) c3json.bar = {};
         if (c3json.bar.width === undefined) c3json.bar.width = {};
@@ -718,6 +749,7 @@ function mmsC3(ElementService, UtilsService, TableService, $compile, growl, $win
       }
    
     var json = JSON.stringify(c3json);
+    console.log("===============mmsC3=====================");
     console.log(json);
     var chart = c3.generate(c3json);
     
@@ -752,7 +784,8 @@ function mmsC3(ElementService, UtilsService, TableService, $compile, growl, $win
   scope.render = function() {
 
     if (scope.mmsEid === undefined) { //data is not from table
-      vf_pplot([], 0, false, false);
+      if ( scope.c3datarows !== undefined || scope.c3datacolumns !== undefined || scope.c3dataurl !== undefined || scope.c3datajson !== undefined)
+        vf_pplot([], 0, false, false);
       return;
     }
     svg.selectAll('*').remove();
@@ -993,7 +1026,8 @@ function mmsC3(ElementService, UtilsService, TableService, $compile, growl, $win
         c3gaugemin: '@',
         c3gaugemax: '@',
         c3gaugeunits: '@',
-        c3gaugewidth: '@'
+        c3gaugewidth: '@',
+        c3zzz: '@'
       },
       link: mmsChartLink
     }; //return
