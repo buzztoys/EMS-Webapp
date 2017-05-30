@@ -105,6 +105,11 @@ function TableService($q, $http, URLService, UtilsService, CacheService, _, Elem
       ElementService.getElement(reqOb, 1, false)
       .then(function(data) {
 
+        console.log("TableService.readTables.data....");
+        console.log(data);
+
+
+
         var tableTitles = []; //used only for display
         var tableIds = []; //used as filter id
         var tableColumnHeadersLabels=[];
@@ -123,8 +128,13 @@ function TableService($q, $http, URLService, UtilsService, CacheService, _, Elem
         dataValuesMmmEid.refId = reqOb.refId;
         dataValuesMmmEid.commitId = reqOb.commitId;
 
+
         var columnCounter;
         var i, j, k;
+
+        console.log("data._contents");
+        console.log(data._contents);
+
         if ( data._contents !==  undefined){ //use contents if exist
         //if ( data.specialization.contains ===  undefined){  
           var tempMmsEid = [];
@@ -140,6 +150,9 @@ function TableService($q, $http, URLService, UtilsService, CacheService, _, Elem
           ElementService.getElements(tempMmsEid, 1, false)
             .then(function(values) {
 
+              console.log("values...");
+              console.log(values);
+
               for ( k = 0; k < values.length; k++){
                 var s = JSON.parse(values[k].specification.value);
                 if ( s.type === "Table"){
@@ -153,6 +166,8 @@ function TableService($q, $http, URLService, UtilsService, CacheService, _, Elem
                     }
                     tableColumnHeadersLabels.push(columnHeaders);
                   }
+                  console.log("tableColumnHeadersLabels");
+                  console.log(tableColumnHeadersLabels);
                   numOfRowHeadersPerTable.push(s.body.length);
                   for ( i = 0; i < s.body.length; i++){
                     rowHeadersMmsEid.elementIds.push(s.body[i][0].content[0].source);
@@ -168,7 +183,10 @@ function TableService($q, $http, URLService, UtilsService, CacheService, _, Elem
               readTablesCommon();
             });
         }
-        else {
+        /*else {
+          console.log("data............");
+          console.log(data);
+
           var tableContains = [];
           for ( k = 0; k < data.contains.length; k++ ){
             if ( data.contains[k].type ==="Table"){
@@ -206,7 +224,7 @@ function TableService($q, $http, URLService, UtilsService, CacheService, _, Elem
             }
           } //end of for k
           readTablesCommon();
-        }
+        }*/
 
         //requires numOfRowHeadersPerTable, rowHeadersMmsEid, dataValuesMmmEid, tableIds(to get number of tables)
         //common function to read 2.2 and previous version JSON
