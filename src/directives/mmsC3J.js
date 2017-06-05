@@ -33,9 +33,7 @@ function mmsC3J(ElementService, UtilsService, TableService, $compile, growl, $wi
     function vf_pplot(_columns, _index, _is_x_value_number, _has_column_header) {
 
       svg.append('div').attr("id", 'c3chart' + scope.$id + _index);
-      
-      console.log(scope.c3j.replace(/'/g, '"'));
-
+     
       var c3json = JSON.parse(scope.c3j.replace(/'/g, '"'));
       c3json.bindto = '#c3chart' + scope.$id + _index;
       
@@ -91,16 +89,8 @@ function mmsC3J(ElementService, UtilsService, TableService, $compile, growl, $wi
     console.log(json);
     var chart = c3.generate(c3json);
     
-    /*var zz2 = {bindto:'#c3chart' + _index ,
+    /*var zz2 = {bindto:'#c3chart' + scope.$id + _index,
     data: {
-        columns: [
-            ['data1', 30, 20, 50, 40, 60, 50],
-            ['data2', 200, 130, 90, 240, 130, 220],
-            ['data3', 300, 200, 160, 400, 250, 250],
-            ['data4', 200, 130, 90, 240, 130, 220],
-            ['data5', 130, 120, 150, 140, 160, 150],
-            ['data6', 90, 70, 20, 50, 60, 120],
-        ],
         type: 'line',
         types: {
             data3: 'bar',
@@ -109,12 +99,21 @@ function mmsC3J(ElementService, UtilsService, TableService, $compile, growl, $wi
         },
         groups: [
             ['data3','data4']
+        ],
+        columns: [
+            ['data1', 30, 20, 50, 40, 60, 50],
+            ['data2', 200, 130, 90, 240, 130, 220],
+            ['data3', 300, 200, 160, 400, 250, 250],
+            ['data4', 200, 130, 90, 240, 130, 220],
+            ['data5', 130, 120, 150, 140, 160, 150],
+            ['data6', 90, 70, 20, 50, 60, 120],
         ]
+        
     }
   };
-    //var json2 = JSON.stringify(zz);
-    //console.log(json2);
-    //c3.generate(zz);
+    var json2 = JSON.stringify(zz2);
+    console.log(json2);
+    var chart = c3.generate(zz2);
     */
 
 	}//end of vf_pplot()
